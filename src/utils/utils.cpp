@@ -35,23 +35,14 @@ void splitKeyValue(const std::string& line, std::string& key, std::string& value
     }
 }
 
-
-// void splitKeyValue(const std::string& line, std::string& key, std::string& value) {
-//     // Find the first whitespace character that is not leading (to get the end of the key)
-//     size_t keyEnd = line.find_first_of(" \t");
-//     // Find the start of the value by finding the first non-whitespace character after the key
-//     size_t valueStart = line.find_first_not_of(" \t", keyEnd);
-
-//     if (keyEnd != std::string::npos) {
-//         key = line.substr(0, keyEnd);
-//         key = trim(key); // Just in case theres leading whitespace
-//     }
-
-//     if (valueStart != std::string::npos) {
-//         value = line.substr(valueStart);
-//         value = trim(value); // Remove potential trailing whitespace
-//     }
-// }
+int convertStringToInt(const std::string& str) {
+    std::istringstream iss(str);
+    double temp;
+    iss >> temp;
+    if (iss.fail() || temp < 0 || temp > std::numeric_limits<int>::max())
+        throw std::runtime_error("Cannot convert to int: " + str);
+    return static_cast<int>(temp);
+}
 
 /* -------------------------------------------------------------------------- */
 /*                              Enum conversions                              */
@@ -71,15 +62,6 @@ RequestTypes stringToRequestType(const std::string& str) {
     if (str == "DELETE") return DELETE;
     if (str == "POST") return POST;
     throw std::runtime_error("Unsupported request type: " + str);
-}
-
-int convertStringToInt(const std::string& str) {
-    std::istringstream iss(str);
-    double temp;
-    iss >> temp;
-    if (iss.fail() || temp < 0 || temp > std::numeric_limits<int>::max())
-        throw std::runtime_error("Cannot convert to int: " + str);
-    return static_cast<int>(temp);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -112,5 +94,5 @@ void printHTTPConfig(const HTTPConfig& config) {
         }
     }
     std::cout << std::endl;
-    std::cout << "FINISHED HTTP CONFIG!" << std::endl;
+    std::cout << "FINISHED PRINTING HTTP CONFIG!" << std::endl;
 }
