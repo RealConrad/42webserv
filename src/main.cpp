@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
         else
             configManager.parseConfigFile(argv[1]);
         printHTTPConfig(configManager.getConfig());
-    } catch (const std::exception& e) {
+    } catch (const std::runtime_error& e) {
         std::cerr << "Error: " << e.what() << std::endl;
     }
 
