@@ -1,0 +1,64 @@
+body {
+  font-family: Arial, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative; /* Add this to position the credits absolutely */
+  height: 100vh;
+  flex-direction: column;
+  background: linear-gradient(120deg, #fccb90 0%, #d57eeb 100%);
+  margin: 0; /* Remove default margin */
+}
+
+.github-link {
+  text-decoration: underline;
+  color: blanchedalmond;
+}
+
+
+.header {
+  color: antiquewhite;
+  font-size: 8em;
+  margin-bottom: 10px;
+}
+
+.credits {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-size: 1.5em;
+  margin: 10px;
+  color: cornsilk;
+}
+
+.buttons {
+  display: flex;
+  justify-content: space-around;
+  width: 100%;
+  max-width: 600px;
+}
+
+button {
+  padding: 10px 20px;
+  font-size: 1em;
+  cursor: pointer;
+}
+
+.content {
+  text-align: center;
+  color: antiquewhite;
+  font-size: 2em;
+}
+
+.back-button {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-size: 1.2em;
+  padding: 10px 15px;
+  background-color: #f8b400;
+  color: #fff;
+  text-decoration: none;
+  border: 2px solid #d89e00;
+  border-radius: 5px;
+}
