@@ -8,6 +8,7 @@
 #include <sstream>
 #include <stack>
 #include <limits>
+#include <set>
 #include "Structs.hpp"
 #include "Utils.hpp"
 
@@ -17,15 +18,18 @@ class ConfigManager {
         std::stack<SectionTypes> sectionStack;
 
         void parseHttpSection(std::ifstream& configFile, std::string& line);
-
         void parseServerSection(std::ifstream& configFile, std::string& line, ServerConfig& serverConfig);
         void handleServerDirective(std::string& line, ServerConfig& serverConfig);
-
         void parseLocationSection(std::ifstream& configFile, std::string& line, LocationConfig& locConfig);
+        void checkLocationPath(std::string& line, LocationConfig& locConfig);
+
+        void validateServerConfig(ServerConfig& serverConfig);
+        void validateLocationConfig(LocationConfig& locationConfig, std::set<std::string> uniquePaths);
     public:
         ConfigManager();
         ~ConfigManager();
         void parseConfigFile(std::string configFilePath);
+        void validateConfiguration();
         HTTPConfig& getConfig();
 };
 

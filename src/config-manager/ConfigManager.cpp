@@ -1,6 +1,8 @@
 #include "ConfigManager.hpp"
 
-ConfigManager::ConfigManager() {}
+ConfigManager::ConfigManager() {
+    this->httpConfig.server_timeout_time = -1;
+}
 
 ConfigManager::~ConfigManager() {}
 
@@ -25,8 +27,9 @@ void ConfigManager::parseConfigFile(std::string configFilePath) {
             throw std::runtime_error("Unexpected line: " + line);
         }
     }
+    configFile.close();
+    validateConfiguration();
 }
-
 
 /* -------------------------------------------------------------------------- */
 /*                              Handle HTTP block                             */
@@ -36,24 +39,22 @@ void ConfigManager::parseHttpSection(std::ifstream& configFile, std::string& lin
     this->sectionStack.push(HTTP); // Add HTTP to the stack
 
     while (!sectionStack.empty()) {
-        getline(configFile, line);
+        if (!getline(configFile, line)) {
+            throw std::runtime_error("Configuration file is missing closing brace '}' for a section");
+        }
         line = trim(line);
-        std::string key, value;
-        splitKeyValue(line, key, value);
 
         if (line.empty() || line[0] == '#')
             continue;
-
+        std::string key, value;
+        splitKeyValue(line, key, value);
         if (line == "}") {
             sectionStack.pop(); // Exiting current section
-        } else if (key == "server_timeout_time") { // TODO: CLEANUP create function to convert type
-            std::istringstream iss(value);
-            double temp;
-            iss >> temp;
-            if (iss.fail() || temp < 0 || temp > std::numeric_limits<int>::max())
-                throw std::runtime_error("Invalid port " + value);
-            this->httpConfig.server_timeout_time = temp;
-        } else if (line.find("server") == 0) {
+        } else if (key == "server_timeout_time") {
+            if (value.empty())
+                throw std::runtime_error("Value is missing for 'server_timeout_time'");
+            this->httpConfig.server_timeout_time = convertStringToInt(value);
+        } else if (line == "server {") {
             ServerConfig serverConfig;
             parseServerSection(configFile, line, serverConfig);
             this->httpConfig.serverConfigs.push_back(serverConfig);
@@ -73,6 +74,9 @@ void ConfigManager::parseServerSection(std::ifstream& configFile, std::string& l
     while (!this->sectionStack.empty()) {
         getline(configFile, line);
         line = trim(line);
+        if (line.empty() || line[0] == '#')
+            continue;
+
         if (line == "}") {
             this->sectionStack.pop(); // Exiting current section
             break; // Break since we're done with this server section
@@ -97,20 +101,10 @@ void ConfigManager::handleServerDirective(std::string& line, ServerConfig& serve
         serverConfig.indexFile = value;
     } else if (key == "server_name") {
         serverConfig.serverName = value;
-    } else if (key == "listen") { // TODO: CLEANUP create function to convert type
-        std::istringstream iss(value);
-        double temp;
-        iss >> temp;
-        if (iss.fail() || temp < 0 || temp > std::numeric_limits<int>::max())
-            throw std::runtime_error("Invalid port " + value);
-        serverConfig.listenPort = temp;
-    } else if (key == "max_body_size") { // TODO: CLEANUP create function to convert type
-        std::istringstream iss(value);
-        double temp;
-        iss >> temp;
-        if (iss.fail() || temp < 0 || temp > std::numeric_limits<int>::max())
-            throw std::runtime_error("Invalid port " + value);
-        serverConfig.clientMaxBodySize = temp;
+    } else if (key == "listen") {
+        serverConfig.listenPort = convertStringToInt(value);
+    } else if (key == "max_body_size") {
+        serverConfig.clientMaxBodySize = convertStringToInt(value);
     } else if (key == "root") {
         serverConfig.rootDirectory = value;
     } else if (key == "directory_listing") {
@@ -127,19 +121,12 @@ void ConfigManager::handleServerDirective(std::string& line, ServerConfig& serve
 void ConfigManager::parseLocationSection(std::ifstream& configFile, std::string& line, LocationConfig& locConfig) {
     this->sectionStack.push(LOCATION); // Entering location section
     
-    std::string locationPath;
-    // locationPath is dummy value and will not be used. Only created to make function work
-    splitKeyValue(line, locationPath, locConfig.locationPath);
-    // locConfig.locationPath contains "<path> {". remove the "{":
-    size_t bracePos = locConfig.locationPath.find('{');
-    if (bracePos != std::string::npos) {
-        locConfig.locationPath = locConfig.locationPath.substr(0, bracePos);
-        locConfig.locationPath = trim(locConfig.locationPath); // Trim any trailing whitespace left after removing "{"
-    }
-
+    checkLocationPath(line, locConfig);
     while (!this->sectionStack.empty()) {
         getline(configFile, line);
         line = trim(line);
+        if (line.empty() || line[0] == '#')
+            continue;
 
         if (line == "}") {
             this->sectionStack.pop(); // Exit current section
@@ -159,5 +146,73 @@ void ConfigManager::parseLocationSection(std::ifstream& configFile, std::string&
                 throw std::runtime_error("Unknown key in Location section: " + key);
             }
         }
+    }
+}
+
+void ConfigManager::checkLocationPath(std::string& line, LocationConfig& locConfig) {
+    std::string key, value;
+    splitKeyValue(line, key, locConfig.locationPath);
+
+    // After calling splitKeyValue, locConfig.locationPath contains "/path {"
+    // First, let's trim the trailing "{" from locConfig.locationPath
+    size_t bracePos = locConfig.locationPath.find('{');
+    if (bracePos != std::string::npos) {
+        locConfig.locationPath = locConfig.locationPath.substr(0, bracePos);
+        locConfig.locationPath = trim(locConfig.locationPath); // Trim any whitespace left after removing "{"
+    }
+
+    // Check the number of parts in the location directive
+    std::istringstream iss(line);
+    std::vector<std::string> parts;
+    std::string part;
+    while (iss >> part) {
+        parts.push_back(part);
+    }
+
+    // Expecting 3 parts: "location", "/path", and "{"
+    if (parts.size() != 3 || locConfig.locationPath.empty()) {
+        throw std::runtime_error("Invalid location path format: " + line);
+    }
+}
+
+/* -------------------------------------------------------------------------- */
+/*                               Validate Config                              */
+/* -------------------------------------------------------------------------- */
+
+void ConfigManager::validateConfiguration() {
+    if (this->httpConfig.server_timeout_time == -1)
+        throw std::runtime_error("Http config missing required 'server_timeout_time'");
+    if (this->httpConfig.serverConfigs.size() == 0) {
+        throw std::runtime_error("Http config missing required 'server'");
+    }
+    for (size_t i = 0; i < this->httpConfig.serverConfigs.size(); i++) {
+        validateServerConfig(this->httpConfig.serverConfigs[i]);
+
+        std::set<std::string> uniquePaths;
+        for (size_t j = 0; j < this->httpConfig.serverConfigs[i].locations.size(); j++) {
+            validateLocationConfig(this->httpConfig.serverConfigs[i].locations[j], uniquePaths);
+        }
+    }
+}
+
+void ConfigManager::validateServerConfig(ServerConfig& serverConfig) {
+    if (serverConfig.listenPort == 0)
+        throw std::runtime_error("Server config missing required 'listenPort'");
+    if (serverConfig.rootDirectory.empty())
+        throw std::runtime_error("Server config missing required 'rootDirectory'");
+    if (serverConfig.indexFile.empty())
+        throw std::runtime_error("Server config missing required 'index'");
+    if (serverConfig.serverName.empty())
+        throw std::runtime_error("Server config missing required 'server_name'");
+}
+
+void ConfigManager::validateLocationConfig(LocationConfig& locationConfig, std::set<std::string> uniquePaths) {
+    
+    if (locationConfig.allowedRequestTypes.empty()) {
+        throw std::runtime_error("Location config missing required 'allowedRequestTypes'");
+    }
+    if (!uniquePaths.insert(locationConfig.locationPath).second) {
+        // Insert failed, indicating a duplicate
+        throw std::runtime_error("Duplicate path found: " + locationConfig.locationPath);
     }
 }
