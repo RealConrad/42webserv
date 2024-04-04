@@ -37,7 +37,7 @@ void ConfigManager::initServerConfig(ServerConfig& serverConfig) {
     serverConfig.directoryListing = false;
 
     this->required.clear();
-    defined.clear();
+    this->defined.clear();
     this->required.push_back("index");
     this->required.push_back("server_name");
     this->required.push_back("listen");
@@ -102,9 +102,9 @@ void ConfigManager::parseServerSection(std::ifstream& configFile, std::string& l
         }
     }
     if (!this->required.empty()){
-        std::string missing = required[0]; // Start with the first element
-        for (size_t i = 1; i < required.size(); ++i) {
-            missing += " " + required[i]; // Append the rest of the elements with a leading space
+        std::string missing = this->required[0]; // Start with the first element
+        for (size_t i = 1; i < this->required.size(); ++i) {
+            missing += " " + this->required[i]; // Append the rest of the elements with a leading space
         }
         throw std::runtime_error("Server config missing required elements: " + missing);
     }
@@ -116,7 +116,7 @@ void ConfigManager::handleServerDirective(std::string& line, ServerConfig& serve
 
     if (key.empty() || value.empty())
         throw std::runtime_error("Could not find key or value for Server directive: " + line);
-    if (std::find(defined.begin(), defined.end(), key) != defined.end())
+    if (std::find(this->defined.begin(), this->defined.end(), key) != this->defined.end())
         throw std::runtime_error("Duplicate key found: " + key);
     if (key == "index") {
         serverConfig.indexFile = value;
@@ -133,8 +133,8 @@ void ConfigManager::handleServerDirective(std::string& line, ServerConfig& serve
     } else {
         throw std::runtime_error("Unknown server key: " + key);
     }
-    required.erase(std::remove(required.begin(), required.end(), key), required.end());
-    defined.push_back(key);
+    this->required.erase(std::remove(this->required.begin(), this->required.end(), key), this->required.end());
+    this->defined.push_back(key);
 }
 
 /* -------------------------------------------------------------------------- */
