@@ -29,11 +29,11 @@ struct ServerConfig {
     int listenPort;
     std::string rootDirectory;
     bool directoryListing;
-    std::vector<LocationConfig> locations; // Would be keyed by path OR could just be vector
+    std::vector<LocationConfig> locations;
 };
 
 struct HTTPConfig {
-    std::vector<ServerConfig> serverConfigs; // Would be keyed by listenPort OR could just be vector
+    std::vector<ServerConfig> serverConfigs;
     int server_timeout_time;
 };
 
