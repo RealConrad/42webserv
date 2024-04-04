@@ -16,21 +16,42 @@ std::string trim(const std::string& str) {
 }
 
 void splitKeyValue(const std::string& line, std::string& key, std::string& value) {
-    // Find the first whitespace character that is not leading (to get the end of the key)
+    // Reset key and value for each call
+    key = "";
+    value = "";
+
+    // Find the first whitespace character to get the end of the key
     size_t keyEnd = line.find_first_of(" \t");
-    // Find the start of the value by finding the first non-whitespace character after the key
-    size_t valueStart = line.find_first_not_of(" \t", keyEnd);
-
-    if (keyEnd != std::string::npos) {
-        key = line.substr(0, keyEnd);
-        key = trim(key); // Just in case theres leading whitespace
-    }
-
-    if (valueStart != std::string::npos) {
-        value = line.substr(valueStart);
-        value = trim(value); // Remove potential trailing whitespace
+    // If there's no whitespace, assume the entire line is the key
+    if (keyEnd == std::string::npos) {
+        key = trim(line); // The entire line is the key
+    } else {
+        // Split the line into key and value
+        key = trim(line.substr(0, keyEnd));
+        size_t valueStart = line.find_first_not_of(" \t", keyEnd);
+        if (valueStart != std::string::npos) {
+            value = trim(line.substr(valueStart));
+        }
     }
 }
+
+
+// void splitKeyValue(const std::string& line, std::string& key, std::string& value) {
+//     // Find the first whitespace character that is not leading (to get the end of the key)
+//     size_t keyEnd = line.find_first_of(" \t");
+//     // Find the start of the value by finding the first non-whitespace character after the key
+//     size_t valueStart = line.find_first_not_of(" \t", keyEnd);
+
+//     if (keyEnd != std::string::npos) {
+//         key = line.substr(0, keyEnd);
+//         key = trim(key); // Just in case theres leading whitespace
+//     }
+
+//     if (valueStart != std::string::npos) {
+//         value = line.substr(valueStart);
+//         value = trim(value); // Remove potential trailing whitespace
+//     }
+// }
 
 /* -------------------------------------------------------------------------- */
 /*                              Enum conversions                              */
@@ -50,6 +71,15 @@ RequestTypes stringToRequestType(const std::string& str) {
     if (str == "DELETE") return DELETE;
     if (str == "POST") return POST;
     throw std::runtime_error("Unsupported request type: " + str);
+}
+
+int convertStringToInt(const std::string& str) {
+    std::istringstream iss(str);
+    double temp;
+    iss >> temp;
+    if (iss.fail() || temp < 0 || temp > std::numeric_limits<int>::max())
+        throw std::runtime_error("Cannot convert to int: " + str);
+    return static_cast<int>(temp);
 }
 
 /* -------------------------------------------------------------------------- */
