@@ -31,6 +31,18 @@ void ConfigManager::parseConfigFile(std::string configFilePath) {
     validateConfiguration();
 }
 
+void ConfigManager::initServerConfig(ServerConfig& serverConfig) {
+    serverConfig.rootDirectory = "./root";
+    serverConfig.clientMaxBodySize = 100;
+    serverConfig.directoryListing = false;
+
+    this->required.clear();
+    defined.clear();
+    this->required.push_back("index");
+    this->required.push_back("server_name");
+    this->required.push_back("listen");
+}
+
 /* -------------------------------------------------------------------------- */
 /*                              Handle HTTP block                             */
 /* -------------------------------------------------------------------------- */
@@ -56,6 +68,7 @@ void ConfigManager::parseHttpSection(std::ifstream& configFile, std::string& lin
             this->httpConfig.server_timeout_time = convertStringToInt(value);
         } else if (line == "server {") {
             ServerConfig serverConfig;
+            initServerConfig(serverConfig);
             parseServerSection(configFile, line, serverConfig);
             this->httpConfig.serverConfigs.push_back(serverConfig);
         } else {
@@ -88,6 +101,13 @@ void ConfigManager::parseServerSection(std::ifstream& configFile, std::string& l
             handleServerDirective(line, serverConfig);
         }
     }
+    if (!this->required.empty()){
+        std::string missing = required[0]; // Start with the first element
+        for (size_t i = 1; i < required.size(); ++i) {
+            missing += " " + required[i]; // Append the rest of the elements with a leading space
+        }
+        throw std::runtime_error("Server config missing required elements: " + missing);
+    }
 }
 
 void ConfigManager::handleServerDirective(std::string& line, ServerConfig& serverConfig) {
@@ -96,7 +116,8 @@ void ConfigManager::handleServerDirective(std::string& line, ServerConfig& serve
 
     if (key.empty() || value.empty())
         throw std::runtime_error("Could not find key or value for Server directive: " + line);
-
+    if (std::find(defined.begin(), defined.end(), key) != defined.end())
+        throw std::runtime_error("Duplicate key found: " + key);
     if (key == "index") {
         serverConfig.indexFile = value;
     } else if (key == "server_name") {
@@ -112,6 +133,8 @@ void ConfigManager::handleServerDirective(std::string& line, ServerConfig& serve
     } else {
         throw std::runtime_error("Unknown server key: " + key);
     }
+    required.erase(std::remove(required.begin(), required.end(), key), required.end());
+    defined.push_back(key);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -120,6 +143,7 @@ void ConfigManager::handleServerDirective(std::string& line, ServerConfig& serve
 
 void ConfigManager::parseLocationSection(std::ifstream& configFile, std::string& line, LocationConfig& locConfig) {
     this->sectionStack.push(LOCATION); // Entering location section
+    std::string key, value;
     
     checkLocationPath(line, locConfig);
     while (!this->sectionStack.empty()) {
@@ -127,14 +151,11 @@ void ConfigManager::parseLocationSection(std::ifstream& configFile, std::string&
         line = trim(line);
         if (line.empty() || line[0] == '#')
             continue;
-
         if (line == "}") {
             this->sectionStack.pop(); // Exit current section
             break; // Break since we are done with location section
         } else {
-            std::string key, value;
             splitKeyValue(line, key, value);
-
             if (key == "request_types") {
                 std::istringstream iss(value);
                 std::string requestType;
@@ -150,11 +171,11 @@ void ConfigManager::parseLocationSection(std::ifstream& configFile, std::string&
 }
 
 void ConfigManager::checkLocationPath(std::string& line, LocationConfig& locConfig) {
-    std::string key, value;
+    std::string key;
     splitKeyValue(line, key, locConfig.locationPath);
 
     // After calling splitKeyValue, locConfig.locationPath contains "/path {"
-    // First, let's trim the trailing "{" from locConfig.locationPath
+    // First, trim the trailing "{" from locConfig.locationPath
     size_t bracePos = locConfig.locationPath.find('{');
     if (bracePos != std::string::npos) {
         locConfig.locationPath = locConfig.locationPath.substr(0, bracePos);
@@ -179,40 +200,13 @@ void ConfigManager::checkLocationPath(std::string& line, LocationConfig& locConf
 /*                               Validate Config                              */
 /* -------------------------------------------------------------------------- */
 
+
+// TODO: MAYBE EXPAND FOR OTHER CHECKS?
 void ConfigManager::validateConfiguration() {
     if (this->httpConfig.server_timeout_time == -1)
         throw std::runtime_error("Http config missing required 'server_timeout_time'");
     if (this->httpConfig.serverConfigs.size() == 0) {
         throw std::runtime_error("Http config missing required 'server'");
     }
-    for (size_t i = 0; i < this->httpConfig.serverConfigs.size(); i++) {
-        validateServerConfig(this->httpConfig.serverConfigs[i]);
-
-        std::set<std::string> uniquePaths;
-        for (size_t j = 0; j < this->httpConfig.serverConfigs[i].locations.size(); j++) {
-            validateLocationConfig(this->httpConfig.serverConfigs[i].locations[j], uniquePaths);
-        }
-    }
 }
 
-void ConfigManager::validateServerConfig(ServerConfig& serverConfig) {
-    if (serverConfig.listenPort == 0)
-        throw std::runtime_error("Server config missing required 'listenPort'");
-    if (serverConfig.rootDirectory.empty())
-        throw std::runtime_error("Server config missing required 'rootDirectory'");
-    if (serverConfig.indexFile.empty())
-        throw std::runtime_error("Server config missing required 'index'");
-    if (serverConfig.serverName.empty())
-        throw std::runtime_error("Server config missing required 'server_name'");
-}
-
-void ConfigManager::validateLocationConfig(LocationConfig& locationConfig, std::set<std::string> uniquePaths) {
-    
-    if (locationConfig.allowedRequestTypes.empty()) {
-        throw std::runtime_error("Location config missing required 'allowedRequestTypes'");
-    }
-    if (!uniquePaths.insert(locationConfig.locationPath).second) {
-        // Insert failed, indicating a duplicate
-        throw std::runtime_error("Duplicate path found: " + locationConfig.locationPath);
-    }
-}
