@@ -6,13 +6,14 @@ CXXFLAGS            := -std=c++98 -Wall -Wextra -Werror -g $(INCLUDES)
 # ------------------------------- Source files ------------------------------- #
 OBJ_DIR             := ./objs
 
-VPATH               := ./src/ ./src/config-manager/ ./src/utils/
+VPATH               := ./src/ ./src/config-manager/ ./src/utils/ ./src/logger/
 
 SRC                 := main.cpp
 CONFIG_MANAGER      := ConfigManager.cpp
-UTILS			      := utils.cpp
+LOGGER				:= Logger.cpp
+UTILS			    := utils.cpp
 
-SRCS                := $(SRC) $(CONFIG_MANAGER) $(UTILS)
+SRCS                := $(SRC) $(CONFIG_MANAGER) $(UTILS) $(LOGGER)
 OBJS                := $(addprefix $(OBJ_DIR)/, $(SRCS:.cpp=.o))
 
 all: $(NAME)
