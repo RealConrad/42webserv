@@ -34,7 +34,11 @@ class Logger {
          * @param level The log level (default is set to INFO).
          */
         static void log(const std::string& message, LogLevel level = INFO);
+
+        // Deconstructor
+        ~Logger();
     private:
+        Logger(); // Do not make the class instatiable
         // Pointer to the output stream (console or file).
         static std::ostream* output;
         static std::ofstream fileStream;

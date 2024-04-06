@@ -5,6 +5,10 @@ std::ofstream Logger::fileStream;
 bool Logger::loggingEnabled;
 bool Logger::useColour;
 
+Logger::Logger() {}
+
+Logger::~Logger() {}
+
 void Logger::initialize(bool enableLogging, bool enableLogFile) {
     loggingEnabled = enableLogging;
     setUseColour(true);
