@@ -1,4 +1,5 @@
 #include "ConfigManager.hpp"
+#include "Logger.hpp"
 
 ConfigManager::ConfigManager() {
     this->httpConfig.server_timeout_time = -1;
@@ -29,6 +30,7 @@ void ConfigManager::parseConfigFile(std::string configFilePath) {
     }
     configFile.close();
     validateConfiguration();
+    Logger::log("Parsing was successful", Logger::SUCCESS);
 }
 
 void ConfigManager::initServerConfig(ServerConfig& serverConfig) {
