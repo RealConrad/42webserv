@@ -63,6 +63,8 @@ void Logger::setLogFile(const std::string& filename) {
 
 std::string Logger::getLevelString(LogLevel level) {
     switch (level) {
+        case SUCCESS:
+            return "SUCCESS";
         case INFO:
             return "INFO";
         case WARNING:
@@ -77,8 +79,10 @@ std::string Logger::getLevelString(LogLevel level) {
 
 std::string Logger::getColor(LogLevel level) {
     switch (level) {
-        case INFO:
+        case SUCCESS:
             return "\033[32m"; // Green
+        case INFO:
+            return "\033[34m"; // Blue
         case WARNING:
             return "\033[33m"; // Yellow
         case ERROR:

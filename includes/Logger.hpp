@@ -9,6 +9,7 @@
 class Logger {
     public:
         enum LogLevel {
+            SUCCESS,
             INFO,
             WARNING,
             ERROR
