@@ -2,3 +2,4 @@ webserv
 *.o
 objs/
 settings.json
+webserv.log
