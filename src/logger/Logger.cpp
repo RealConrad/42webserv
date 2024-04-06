@@ -20,7 +20,8 @@ void Logger::setUseColour(bool value) {
 }
 
 void Logger::log(const std::string& message, LogLevel level) {
-    if (!loggingEnabled) return;
+    if (!loggingEnabled)
+        return;
 
     // Get current time
     std::time_t t = std::time(NULL);
