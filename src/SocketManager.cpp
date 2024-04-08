@@ -1,5 +1,4 @@
 #include "SocketManager.hpp"
-#include "Logger.hpp"
 
 SocketManager::SocketManager(const HTTPConfig& config): config(config) {}
 
@@ -32,7 +31,7 @@ int SocketManager::createAndBindSocket(int port) {
 	int flags = fcntl(sockfd, F_GETFL, 0);
 	if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) < 0) {
 		close(sockfd);
-		ERROR("Failed to set to non blocking mode for socket: " << socket);
+		ERROR("Failed to set to non blocking mode for socket: " << sockfd);
 		return -1;
 	}
 

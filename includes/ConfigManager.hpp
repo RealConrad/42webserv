@@ -1,6 +1,9 @@
 #ifndef CONFIG_MANAGER_HPP
 #define CONFIG_MANAGER_HPP
 
+#include "Structs.hpp"
+#include "Utils.hpp"
+
 #include <string>
 #include <stdexcept>
 #include <iostream>
@@ -9,8 +12,6 @@
 #include <stack>
 #include <limits>
 #include <algorithm>
-#include "Structs.hpp"
-#include "Utils.hpp"
 
 class ConfigManager {
     private:
