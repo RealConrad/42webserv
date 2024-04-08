@@ -16,6 +16,7 @@ void SocketManager::setupServerSockets() {
 		if (sockfd >= 0) {
 			struct pollfd pfd = {sockfd, POLLIN, 0};
 			this->fds.push_back(pfd);
+			this->server_fds.push_back(sockfd);
 		}
 	}
 }
