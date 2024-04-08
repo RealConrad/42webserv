@@ -4,8 +4,8 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <sstream> 
 #include <ctime>
-
 
 #define DEBUG(message) { \
     std::ostringstream oss; \

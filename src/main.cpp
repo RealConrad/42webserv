@@ -1,4 +1,5 @@
 #include "ConfigManager.hpp"
+#include "SocketManager.hpp"
 #include "Logger.hpp"
 #include <stdexcept>
 
@@ -17,7 +18,9 @@ int main(int argc, char** argv) {
             configManager.parseConfigFile("config/default.config");
         else
             configManager.parseConfigFile(argv[1]);
-        // printHTTPConfig(configManager.getConfig());
+		SocketManager socketManager(configManager.getConfig());
+		socketManager.setupServerSockets();
+		socketManager.run();
     } catch (const std::runtime_error& e) {
     	ERROR(e.what());
     }
