@@ -16,18 +16,26 @@ class SocketManager {
 		std::vector<struct pollfd> fds;
 		std::vector<int> server_fds;
 
-		
 		void acceptNewConnections(int server_fd);
 		void closeConnection(int fd);
 		int createAndBindSocket(int port);
+		void handleClient(int fd);
+		void addServerFd(int fd);
+		bool isServerSocket(int fd);
+
+		template <typename T>
+		void removeElement(std::vector<T>& vec, const T& value) {
+			typename std::vector<T>::iterator it = std::find(vec.begin(), vec.end(), value);
+			if (it != vec.end()) {
+				vec.erase(it);
+			}
+		}
 	public:
 		SocketManager(const HTTPConfig& config);
 		~SocketManager();
 
 		void setupServerSockets();
 		void run();
-		void addServerFd(int fd); // Method to add a server FD
-		bool isServerSocket(int fd); // Method to check if FD is a server socket
 };
 
 #endif

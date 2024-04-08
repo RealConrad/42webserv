@@ -52,17 +52,44 @@ int SocketManager::createAndBindSocket(int port) {
 		ERROR("Failed to initialize listen for socket: " << sockfd);
 		return -1;
 	}
-	SUCCESS("Socket "<< sockfd << " listens on port " << port << "!");
+	SUCCESS("Socket "<< sockfd << " is listening on port " << port);
 	return sockfd;
 }
 
 void SocketManager::acceptNewConnections(int server_fd) {
-	(void)server_fd;
+	sockaddr_in client_addr;
+	socklen_t clilen = sizeof(client_addr);
+	int newsockfd = accept(server_fd, (struct sockaddr*)&client_addr, &clilen);
+	if (newsockfd < 0) {
+		ERROR("Error accepting connection");
+		return;
+	}
+
+	// Make the new socket non-blocking
+	int flags = fcntl(newsockfd, F_GETFL, 0);
+	fcntl(newsockfd, F_SETFL, flags | O_NONBLOCK);
+
+	// Add the new socket to the fds vector to monitor it with poll()
+	struct pollfd new_pfd = {newsockfd, POLLIN, 0};
+	this->fds.push_back(new_pfd);
+	INFO("Accepted new connection");
 }
 
 void SocketManager::closeConnection(int fd) {
 	INFO("Closing socket: " << fd);
 	close(fd);
+}
+
+void SocketManager::addServerFd(int fd) {
+	server_fds.push_back(fd); // Add the server FD to the vector
+}
+
+bool SocketManager::isServerSocket(int fd) {
+	return std::find(server_fds.begin(), server_fds.end(), fd) != server_fds.end();
+}
+
+void SocketManager::handleClient(int fd) {
+	(void)fd;
 }
 
 void SocketManager::run() {
@@ -73,9 +100,9 @@ void SocketManager::run() {
 
 	while (true) {
 		// Poll the sockets for events
-		int ret = poll(&this->fds[0], this->fds.size(), -1); // -1 means no timeout
+		int num_elements = poll(&this->fds[0], this->fds.size(), -1); // -1 means no timeout
 
-		if (ret < 0) {
+		if (num_elements < 0) {
 			ERROR("poll() error");
 			break;
 		}
@@ -84,37 +111,21 @@ void SocketManager::run() {
 		for (size_t i = 0; i < this->fds.size(); i++) {
 			if (this->fds[i].revents & POLLIN) { // Check if ready for reading
 				if (isServerSocket(this->fds[i].fd)) {
-					// Accept a new connection
-					sockaddr_in client_addr;
-					socklen_t clilen = sizeof(client_addr);
-					int newsockfd = accept(this->fds[i].fd, (struct sockaddr*)&client_addr, &clilen);
-					if (newsockfd < 0) {
-						ERROR("Error accepting connection");
-						continue;
-					}
-
-					// Make the new socket non-blocking
-					int flags = fcntl(newsockfd, F_GETFL, 0);
-					fcntl(newsockfd, F_SETFL, flags | O_NONBLOCK);
-
-					// Add the new socket to the fds vector to monitor it with poll()
-					struct pollfd new_pfd = {newsockfd, POLLIN, 0};
-					this->fds.push_back(new_pfd);
-
-					INFO("Accepted new connection");
+					acceptNewConnections(this->fds[i].fd);
 				} else {
-					// Here, handle read/write for client sockets
+					// read data from the client socket, parse into an HTTP request
+					handleClient(this->fds[i].fd);
 				}
+			}
+			// Handle error
+			if (this->fds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+				int fd = this->fds[i].fd;
+				closeConnection(fd);
+				this->fds.erase(fds.begin() + i);
+				removeElement(this->server_fds, fd);
+				// adjust index after removeing an element
+				i--;
 			}
 		}
 	}
 }
-
-void SocketManager::addServerFd(int fd) {
-    server_fds.push_back(fd); // Add the server FD to the vector
-}
-
-bool SocketManager::isServerSocket(int fd) {
-    return std::find(server_fds.begin(), server_fds.end(), fd) != server_fds.end();
-}
-
