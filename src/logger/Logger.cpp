@@ -75,7 +75,7 @@ void Logger::log(const std::string& message, const char* file, int line, LogLeve
         colorEnd = "\033[0m";
     }
 
-    *output << colorStart << "[" << timeStr << "] " << "[" << getLevelString(level) << "] "  << "[" << file << ":" << line << "]\t\t" << message << colorEnd << std::endl;
+    *output << colorStart << "[" << timeStr << "] " << "[" << getLevelString(level) << "]  \t" << message << colorEnd << " [" << file << ":" << line << "]" << std::endl;
 }
 
 
@@ -85,7 +85,7 @@ void Logger::setLogFile(const std::string& filename) {
 
     fileStream.open(filename.c_str());
     if (fileStream.fail()) {
-        // ERROR("Failed to open log file: " + filename);
+        std::cerr << "Failed to open log file: " << filename << std::endl;
         output = &std::cout;
         setUseColour(true); // Enable when logging out to console
     } else {
@@ -107,7 +107,6 @@ std::string Logger::getLevelString(LogLevel level) {
         case ERROR:
             return "ERROR";
         default:
-            // log("UNKNOWN LOG LEVEL!", ERROR);
             return "UNKNOWN";
     }
 }
@@ -115,7 +114,7 @@ std::string Logger::getLevelString(LogLevel level) {
 std::string Logger::getColor(LogLevel level) {
     switch (level) {
         case DEBUG:
-            return "\033[38;5;208m"; // Attempt for a less intense green (might look the same as regular green)
+            return "\033[38;5;208m"; // Orange
         case SUCCESS:
             return "\033[32m"; // Green
         case INFO:
