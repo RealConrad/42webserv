@@ -7,7 +7,9 @@
 #include <fcntl.h>
 #include <poll.h> // poll
 #include <netinet/in.h> // sockaddr_in
+#include <algorithm>
 #include "Structs.hpp"
+#include "HTTPRequest.hpp"
 #include "Logger.hpp"
 
 class SocketManager {
@@ -15,6 +17,7 @@ class SocketManager {
 		HTTPConfig config;
 		std::vector<struct pollfd> fds;
 		std::vector<int> server_fds;
+		std::map<int, ClientState> clientStates;
 
 		void acceptNewConnections(int server_fd);
 		void closeConnection(int fd);
@@ -23,13 +26,6 @@ class SocketManager {
 		void addServerFd(int fd);
 		bool isServerSocket(int fd);
 
-		template <typename T>
-		void removeElement(std::vector<T>& vec, const T& value) {
-			typename std::vector<T>::iterator it = std::find(vec.begin(), vec.end(), value);
-			if (it != vec.end()) {
-				vec.erase(it);
-			}
-		}
 	public:
 		SocketManager(const HTTPConfig& config);
 		~SocketManager();

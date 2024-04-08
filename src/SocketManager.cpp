@@ -66,6 +66,8 @@ void SocketManager::acceptNewConnections(int server_fd) {
 		return;
 	}
 
+	this->clientStates[newsockfd] = ClientState();
+
 	// Make the new socket non-blocking
 	int flags = fcntl(newsockfd, F_GETFL, 0);
 	fcntl(newsockfd, F_SETFL, flags | O_NONBLOCK);
@@ -76,21 +78,52 @@ void SocketManager::acceptNewConnections(int server_fd) {
 	SUCCESS("Server socket " << server_fd << " Accepted new connection from " << &client_addr);
 }
 
-void SocketManager::closeConnection(int fd) {
-	INFO("Closing socket: " << fd);
-	close(fd);
-}
-
-void SocketManager::addServerFd(int fd) {
-	server_fds.push_back(fd); // Add the server FD to the vector
-}
-
-bool SocketManager::isServerSocket(int fd) {
-	return std::find(server_fds.begin(), server_fds.end(), fd) != server_fds.end();
-}
-
 void SocketManager::handleClient(int fd) {
-	(void)fd;
+	INFO("Handling client request. FD: " << fd);
+	if (!this->clientStates[fd].requestComplete) {
+		char buffer[4096]; // TODO: change buffer size
+		ssize_t bytesRead = recv(fd, buffer, sizeof(buffer), 0);
+		if (bytesRead > 0) {
+			// Append data to the clients read buffer
+			this->clientStates[fd].readBuffer.append(buffer, bytesRead);
+
+			// Check if request is complete
+			if (this->clientStates[fd].readBuffer.find("\r\n\r\n") != std::string::npos) {
+				this->clientStates[fd].requestComplete = true;
+
+				// Parse request and generate response
+				HTTPRequest request(this->clientStates[fd].readBuffer);
+				request.printValues();
+			}
+		} else if (bytesRead == 0) { // client connection closed
+			WARNING("Client connection closed");
+			closeConnection(fd);
+			return;
+		} else {
+			ERROR("Failed to read from recv()");
+			closeConnection(fd);
+			return;
+		}
+	}
+
+	// Attempt to write repsonse back to client
+	if (this->clientStates[fd].requestComplete) {
+		const std::string& toWrite = this->clientStates[fd].writeBuffer;
+		ssize_t bytesWritten = send(fd, toWrite.c_str(), toWrite.size(), 0);
+		if (bytesWritten >= 0) {
+			this->clientStates[fd].writeBuffer.erase(0, bytesWritten);
+			if (this->clientStates[fd].writeBuffer.empty()) {
+				this->clientStates[fd].responseComplete = true;
+				closeConnection(fd);
+			} else {
+				WARNING("Client write buffer not empty. Did not send all data");
+			}
+		} else if (bytesWritten == 0) {
+			WARNING("No data sent");
+		} else {
+			ERROR("Failed to send response back to client");
+		}
+	}
 }
 
 void SocketManager::run() {
@@ -102,11 +135,14 @@ void SocketManager::run() {
 
 	while (true) {
 		// Poll the sockets for events
-		int num_elements = poll(&this->fds[0], this->fds.size(), -1); // -1 means no timeout
+		int num_elements = poll(&this->fds[0], this->fds.size(), this->config.server_timeout_time);
 
 		if (num_elements < 0) {
 			ERROR("poll() error");
 			break;
+		} else if (num_elements == 0) {
+			// WARNING("Socket(s) timed out, trying again");
+			continue;
 		}
 
 		// Iterate over fds to check which ones are ready
@@ -119,15 +155,50 @@ void SocketManager::run() {
 					handleClient(this->fds[i].fd);
 				}
 			}
-			// Handle error
+			// Checks if the connection is still valid
 			if (this->fds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
-				int fd = this->fds[i].fd;
-				closeConnection(fd);
-				this->fds.erase(fds.begin() + i);
-				removeElement(this->server_fds, fd);
+				closeConnection(this->fds[i].fd);
 				// adjust index after removeing an element
 				i--;
 			}
 		}
 	}
+}
+
+void SocketManager::closeConnection(int fd) {
+    INFO("Closing socket: " << fd);
+    close(fd);
+
+    // Remove from fds vector
+    for (std::vector<struct pollfd>::iterator it = this->fds.begin(); it != this->fds.end();) {
+        if (it->fd == fd) {
+            it = this->fds.erase(it); // Erase returns the next iterator
+        } else {
+            ++it;
+        }
+    }
+
+    // Remove from server_fds vector
+    for (std::vector<int>::iterator it = this->server_fds.begin(); it != this->server_fds.end();) {
+        if (*it == fd) {
+            it = this->server_fds.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    // Remove from clientStates map
+    std::map<int, ClientState>::iterator it = this->clientStates.find(fd);
+    if (it != this->clientStates.end()) {
+        this->clientStates.erase(it);
+    }
+}
+
+
+void SocketManager::addServerFd(int fd) {
+	server_fds.push_back(fd); // Add the server FD to the vector
+}
+
+bool SocketManager::isServerSocket(int fd) {
+	return std::find(server_fds.begin(), server_fds.end(), fd) != server_fds.end();
 }
