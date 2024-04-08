@@ -18,6 +18,16 @@ enum SectionTypes {
     UNKNOWN,
 };
 
+struct ClientState {
+    std::string readBuffer;
+    std::string writeBuffer;
+    bool requestComplete;
+    bool responseComplete;
+
+    // Default constructor
+    ClientState() : requestComplete(false), responseComplete(false) {}
+};
+
 struct LocationConfig {
     std::vector<RequestTypes> allowedRequestTypes;
     std::string locationPath;
