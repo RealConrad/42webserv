@@ -6,7 +6,6 @@
 #include <string>
 #include <ctime>
 
-
 #define DEBUG(message) { \
     std::ostringstream oss; \
     oss << message; \
