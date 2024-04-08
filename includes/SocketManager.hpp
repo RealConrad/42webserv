@@ -14,6 +14,8 @@ class SocketManager {
 	private:
 		HTTPConfig config;
 		std::vector<struct pollfd> fds;
+		std::vector<int> server_fds;
+
 		
 		void acceptNewConnections(int server_fd);
 		void closeConnection(int fd);
@@ -24,6 +26,8 @@ class SocketManager {
 
 		void setupServerSockets();
 		void run();
+		void addServerFd(int fd); // Method to add a server FD
+		bool isServerSocket(int fd); // Method to check if FD is a server socket
 };
 
 #endif

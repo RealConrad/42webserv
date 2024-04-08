@@ -52,6 +52,7 @@ int SocketManager::createAndBindSocket(int port) {
 		ERROR("Failed to initialize listen for socket: " << sockfd);
 		return -1;
 	}
+	SUCCESS("Socket "<< sockfd << " listens on port " << port << "!");
 	return sockfd;
 }
 
@@ -66,25 +67,54 @@ void SocketManager::closeConnection(int fd) {
 
 void SocketManager::run() {
 	if (this->fds.size() == 0) {
-		ERROR("No servers found");
+		ERROR("No servers configured");
 		return;
 	}
-	// while (true) {
-	// 	// Pass all fds to poll stored in `fds`
-	// 	int ret = poll(this->fds.data(), this->fds.size(), this->config.server_timeout_time);
 
-	// 	// Error checking
-	// 	if (ret < 0) {
-	// 		ERROR("Poll() error");
-	// 		break;			
-	// 	} else if (ret == 0) { // 0 indicates time out (no fds were ready), try poll again
-	// 		WARNING("Socket timed out, trying again");
-	// 		continue ;
-	// 	}
-	// 	for (size_t i = 0; i < this->fds.size(); i++) {
-	// 		if (this->fds[i].revents & POLLIN) {
-				
-	// 		}
-	// 	}
-	// }
+	while (true) {
+		// Poll the sockets for events
+		int ret = poll(&this->fds[0], this->fds.size(), -1); // -1 means no timeout
+
+		if (ret < 0) {
+			ERROR("poll() error");
+			break;
+		}
+
+		// Iterate over fds to check which ones are ready
+		for (size_t i = 0; i < this->fds.size(); i++) {
+			if (this->fds[i].revents & POLLIN) { // Check if ready for reading
+				if (isServerSocket(this->fds[i].fd)) {
+					// Accept a new connection
+					sockaddr_in client_addr;
+					socklen_t clilen = sizeof(client_addr);
+					int newsockfd = accept(this->fds[i].fd, (struct sockaddr*)&client_addr, &clilen);
+					if (newsockfd < 0) {
+						ERROR("Error accepting connection");
+						continue;
+					}
+
+					// Make the new socket non-blocking
+					int flags = fcntl(newsockfd, F_GETFL, 0);
+					fcntl(newsockfd, F_SETFL, flags | O_NONBLOCK);
+
+					// Add the new socket to the fds vector to monitor it with poll()
+					struct pollfd new_pfd = {newsockfd, POLLIN, 0};
+					this->fds.push_back(new_pfd);
+
+					INFO("Accepted new connection");
+				} else {
+					// Here, handle read/write for client sockets
+				}
+			}
+		}
+	}
 }
+
+void SocketManager::addServerFd(int fd) {
+    server_fds.push_back(fd); // Add the server FD to the vector
+}
+
+bool SocketManager::isServerSocket(int fd) {
+    return std::find(server_fds.begin(), server_fds.end(), fd) != server_fds.end();
+}
+
