@@ -5,7 +5,7 @@ SocketManager::SocketManager(const HTTPConfig& config): config(config) {}
 SocketManager::~SocketManager() {
 	INFO("Closing all sockets");
 	for (size_t i = 0; i < this->fds.size(); i++) {
-		close(this->fds[i].fd);
+		closeConnection(this->fds[i].fd);
 	}
 }
 
@@ -31,7 +31,7 @@ int SocketManager::createAndBindSocket(int port) {
 	// Make socket non blocking
 	int flags = fcntl(sockfd, F_GETFL, 0);
 	if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) < 0) {
-		close(sockfd);
+		closeConnection(sockfd);
 		ERROR("Failed to set to non blocking mode for socket: " << sockfd);
 		return -1;
 	}
@@ -42,14 +42,14 @@ int SocketManager::createAndBindSocket(int port) {
 	serv_addr.sin_addr.s_addr = INADDR_ANY;
 	serv_addr.sin_port = htons(port);
 	if (bind(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
-		close(sockfd);
+		closeConnection(sockfd);
 		ERROR("Failed to bind socket to port: " << port);
 		return -1;
 	}
 
 	// listen
 	if (listen(sockfd, SOMAXCONN) < 0) {
-		close(sockfd);
+		closeConnection(sockfd);
 		ERROR("Failed to initialize listen for socket: " << sockfd);
 		return -1;
 	}
