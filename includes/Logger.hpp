@@ -6,9 +6,37 @@
 #include <string>
 #include <ctime>
 
+
+#define DEBUG(message) { \
+    std::ostringstream oss; \
+    oss << message; \
+    Logger::log(oss.str(), __FILE__, __LINE__, Logger::DEBUG); \
+}
+#define SUCCESS(message) { \
+    std::ostringstream oss; \
+    oss << message; \
+    Logger::log(oss.str(), __FILE__, __LINE__, Logger::SUCCESS); \
+}
+#define INFO(message) { \
+    std::ostringstream oss; \
+    oss << message; \
+    Logger::log(oss.str(), __FILE__, __LINE__, Logger::INFO); \
+}
+#define WARNING(message) { \
+    std::ostringstream oss; \
+    oss << message; \
+    Logger::log(oss.str(), __FILE__, __LINE__, Logger::WARNING); \
+}
+#define ERROR(message) { \
+    std::ostringstream oss; \
+    oss << message; \
+    Logger::log(oss.str(), __FILE__, __LINE__, Logger::ERROR); \
+}
+
 class Logger {
     public:
         enum LogLevel {
+			DEBUG,
             SUCCESS,
             INFO,
             WARNING,
@@ -21,7 +49,11 @@ class Logger {
          * @param enableLogFile Enables logging to a file instead of the console if true.
          */
         static void initialize(bool enableLogging, bool enableLogFile = false);
-
+        /**
+         * @brief does not print to output or file a specific level from logging.
+         * @param level level of logging to hide. 
+         */
+        static void hide(LogLevel level);
         /**
          * @brief Sets whether log messages should include ANSI colour codes or not
          * @param value If true, log messages will include ANSI colour codes
@@ -33,7 +65,7 @@ class Logger {
          * @param message The message to log.
          * @param level The log level (default is set to INFO).
          */
-        static void log(const std::string& message, LogLevel level = INFO);
+        static void log(const std::string& message, const char* file, int line, LogLevel level = INFO);
 
         // Deconstructor
         ~Logger();
@@ -42,7 +74,11 @@ class Logger {
         // Pointer to the output stream (console or file).
         static std::ostream* output;
         static std::ofstream fileStream;
-        static bool loggingEnabled;
+        static bool debugEnabled;
+        static bool successEnabled;
+        static bool infoEnabled;
+        static bool warningEnabled;
+        static bool errorEnabled;
         static bool useColour;
 
         /**

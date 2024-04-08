@@ -2,15 +2,23 @@
 
 std::ostream* Logger::output = &std::clog;
 std::ofstream Logger::fileStream;
-bool Logger::loggingEnabled;
 bool Logger::useColour;
+bool Logger::debugEnabled;
+bool Logger::successEnabled;
+bool Logger::infoEnabled;
+bool Logger::warningEnabled;
+bool Logger::errorEnabled;
 
 Logger::Logger() {}
 
 Logger::~Logger() {}
 
 void Logger::initialize(bool enableLogging, bool enableLogFile) {
-    loggingEnabled = enableLogging;
+	debugEnabled = enableLogging;
+	successEnabled = enableLogging;
+	infoEnabled = enableLogging;
+	warningEnabled = enableLogging;
+	errorEnabled = enableLogging;
     setUseColour(true);
     output = &std::clog;
 
@@ -23,8 +31,29 @@ void Logger::setUseColour(bool value) {
     useColour = value;
 }
 
-void Logger::log(const std::string& message, LogLevel level) {
-    if (!loggingEnabled)
+void Logger::hide(LogLevel level){
+    if (level == DEBUG)
+		debugEnabled = false;
+    else if (level == SUCCESS)
+		successEnabled = false;
+    else if (level == INFO)
+		infoEnabled = false;
+    else if (level == WARNING)
+		warningEnabled = false;
+    else if (level == ERROR)
+		errorEnabled = false;
+}
+
+void Logger::log(const std::string& message, const char* file, int line, LogLevel level) {
+    if (level == DEBUG && !debugEnabled)
+        return;
+    if (level == SUCCESS && !successEnabled)
+        return;
+    if (level == INFO && !infoEnabled)
+        return;
+    if (level == WARNING && !warningEnabled)
+        return;
+    if (level == ERROR && !errorEnabled)
         return;
 
     // Get current time
@@ -37,9 +66,8 @@ void Logger::log(const std::string& message, LogLevel level) {
     }
 
     // Buffer to hold the time string
-    char timeStr[6]; // HH:MM + null terminator
-    std::strftime(timeStr, sizeof(timeStr), "%H:%M", localTime);
-
+    char timeStr[9]; // HH:MM:SS + null terminator
+    std::strftime(timeStr, sizeof(timeStr), "%H:%M:%S", localTime);
     std::string colorStart = "";
     std::string colorEnd = "";
     if (useColour) {
@@ -47,7 +75,7 @@ void Logger::log(const std::string& message, LogLevel level) {
         colorEnd = "\033[0m";
     }
 
-    *output << colorStart << "[" << getLevelString(level) << "] " << "[" << timeStr << "] " << message << colorEnd << std::endl;
+    *output << colorStart << "[" << timeStr << "] " << "[" << getLevelString(level) << "] "  << "[" << file << ":" << line << "]\t\t" << message << colorEnd << std::endl;
 }
 
 
@@ -57,7 +85,7 @@ void Logger::setLogFile(const std::string& filename) {
 
     fileStream.open(filename.c_str());
     if (fileStream.fail()) {
-        log("Failed to open log file: " + filename, ERROR);
+        // ERROR("Failed to open log file: " + filename);
         output = &std::cout;
         setUseColour(true); // Enable when logging out to console
     } else {
@@ -70,6 +98,8 @@ std::string Logger::getLevelString(LogLevel level) {
     switch (level) {
         case SUCCESS:
             return "SUCCESS";
+        case DEBUG:
+            return "DEBUG";
         case INFO:
             return "INFO";
         case WARNING:
@@ -77,13 +107,15 @@ std::string Logger::getLevelString(LogLevel level) {
         case ERROR:
             return "ERROR";
         default:
-            log("UNKNOWN LOG LEVEL!", ERROR);
+            // log("UNKNOWN LOG LEVEL!", ERROR);
             return "UNKNOWN";
     }
 }
 
 std::string Logger::getColor(LogLevel level) {
     switch (level) {
+        case DEBUG:
+            return "\033[38;5;208m"; // Attempt for a less intense green (might look the same as regular green)
         case SUCCESS:
             return "\033[32m"; // Green
         case INFO:

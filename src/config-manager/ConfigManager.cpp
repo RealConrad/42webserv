@@ -30,7 +30,7 @@ void ConfigManager::parseConfigFile(std::string configFilePath) {
     }
     configFile.close();
     validateConfiguration();
-    Logger::log("Parsing was successful", Logger::SUCCESS);
+    // Logger::log("Parsing was successful", Logger::SUCCESS);
 }
 
 void ConfigManager::initServerConfig(ServerConfig& serverConfig) {
