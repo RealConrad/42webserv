@@ -3,14 +3,15 @@
 #include <stdexcept>
 
 int main(int argc, char** argv) {
+	Logger::initialize(true);
+	INFO("Starting program");
     if (argc > 2) {
-        std::cerr << "Error: Invalid number of parameters" << std::endl;
-        std::cerr << "Usage: ./webserv OR ./webserv <config-file>" << std::endl;
+        ERROR("Invalid number of parameters");
+        INFO("Usage: ./webserv OR ./webserv <config-file>");
         return 1;
     }
-
     try {
-        Logger::initialize(true);
+		INFO("Parsing Config");
         ConfigManager configManager;
         if (argc == 1)
             configManager.parseConfigFile("config/default.config");
@@ -18,9 +19,9 @@ int main(int argc, char** argv) {
             configManager.parseConfigFile(argv[1]);
         // printHTTPConfig(configManager.getConfig());
     } catch (const std::runtime_error& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+    	ERROR(e.what());
     }
 
-    std::cout << "Exiting program" << std::endl;
+	INFO("Exiting program");
     return 0;
 }
