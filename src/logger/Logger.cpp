@@ -59,11 +59,6 @@ void Logger::log(const std::string& message, const char* file, int line, LogLeve
     // Get current time
     std::time_t t = std::time(NULL);
     std::tm* localTime = std::localtime(&t); // Gets the current UTC timezone
-    localTime->tm_hour += 2;
-    if (localTime->tm_hour >= 24) { // Change day if necessary
-        localTime->tm_hour -= 24;
-        localTime->tm_mday += 1;
-    }
 
     // Buffer to hold the time string
     char timeStr[9]; // HH:MM:SS + null terminator
