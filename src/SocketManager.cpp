@@ -72,7 +72,7 @@ void SocketManager::acceptNewConnections(int server_fd) {
 	// Add the new socket to the fds vector to monitor it with poll()
 	struct pollfd new_pfd = {newsockfd, POLLIN, 0};
 	this->fds.push_back(new_pfd);
-	SUCCESS("Server socket "<< server_fd <<  " Accepted new connection from " << &client_addr);
+	SUCCESS("Server socket " << server_fd << " Accepted new connection from " << &client_addr);
 }
 
 void SocketManager::closeConnection(int fd) {
