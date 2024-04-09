@@ -18,6 +18,7 @@ class HTTPRequest {
 
     public:
         HTTPRequest();
+        HTTPRequest(const std::string& request);
         ~HTTPRequest();
         
         void parseRequest(const std::string& request);

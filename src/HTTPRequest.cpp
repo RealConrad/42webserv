@@ -2,6 +2,10 @@
 
 HTTPRequest::HTTPRequest() {}
 
+HTTPRequest::HTTPRequest(const std::string& request) {
+    parseRequest(request);
+}
+
 HTTPRequest::~HTTPRequest() {}
 
 void HTTPRequest::parseRequest(const std::string& request) {
