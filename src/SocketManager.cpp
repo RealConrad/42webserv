@@ -80,6 +80,7 @@ void SocketManager::acceptNewConnections(int server_fd) {
 
 void SocketManager::handleClient(int fd) {
 	INFO("Handling client request. FD: " << fd);
+	HTTPRequest request;
 	if (!this->clientStates[fd].requestComplete) {
 		char buffer[4096]; // TODO: change buffer size
 		ssize_t bytesRead = recv(fd, buffer, sizeof(buffer), 0);
@@ -90,12 +91,10 @@ void SocketManager::handleClient(int fd) {
 			// Check if request is complete
 			if (this->clientStates[fd].readBuffer.find("\r\n\r\n") != std::string::npos) {
 				this->clientStates[fd].requestComplete = true;
-
 				// Parse request and generate response
-				HTTPRequest request(this->clientStates[fd].readBuffer);
-				request.printValues();
+				request.parseRequest(this->clientStates[fd].readBuffer);
 			}
-		} else if (bytesRead == 0) { // client connection closed
+		} else if (bytesRead == 0) {
 			WARNING("Client connection closed");
 			closeConnection(fd);
 			return;
@@ -107,20 +106,38 @@ void SocketManager::handleClient(int fd) {
 	}
 
 	// Attempt to write repsonse back to client
-	if (this->clientStates[fd].requestComplete) {
-		const std::string& toWrite = this->clientStates[fd].writeBuffer;
-		ssize_t bytesWritten = send(fd, toWrite.c_str(), toWrite.size(), 0);
+	if (this->clientStates[fd].requestComplete && !this->clientStates[fd].responseComplete) {
+		HTTPResponse response;
+		const ServerConfig& serverConfig = getCurrentServer(request);
+		if (isMethodAllowed(request.getMethod(), request.getURI(), serverConfig)) {
+			response.setHeader("Content-Type", "text/html");
+			response.setBody("<html><body><h1>200 OK</h1><p>Request successful.</p></body></html>");
+			response.setStatusCode(200);
+		} else {
+			// TODO: Generate proper response
+			response.setHeader("Content-Type", "text/html");
+			response.setBody("<html><body><h1>405 Method Not Allowed</h1></body></html>");
+			response.setStatusCode(405); // 405 = Method not allowed
+			ERROR("Method not allowed for server: " << serverConfig.serverName);
+		}
+
+		this->clientStates[fd].writeBuffer = response.convertToString();
+		// Attempt to send the response
+		ssize_t bytesWritten = send(fd, this->clientStates[fd].writeBuffer.c_str(), this->clientStates[fd].writeBuffer.size(), 0);
 		if (bytesWritten >= 0) {
+			// Erase the sent part of the buffer, check if all data was sent
 			this->clientStates[fd].writeBuffer.erase(0, bytesWritten);
 			if (this->clientStates[fd].writeBuffer.empty()) {
 				this->clientStates[fd].responseComplete = true;
 				closeConnection(fd);
 			} else {
 				WARNING("Client write buffer not empty. Did not send all data");
+				// TODO: Here we have to try to send the rest in a subsequent poll iteration??
 			}
 		} else if (bytesWritten == 0) {
 			WARNING("No data sent");
 		} else {
+			// TODO: most likely errors: EWOULDBLOCK or EAGAIN (common in non-blocking mode apparently), how to handle? no idea
 			ERROR("Failed to send response back to client");
 		}
 	}
@@ -165,6 +182,37 @@ void SocketManager::run() {
 	}
 }
 
+ServerConfig& SocketManager::getCurrentServer(const HTTPRequest& request) {
+	std::string hostName = request.getHeader("Host");
+
+	// Get rid of potential port number from host if present
+	size_t colonPos = hostName.find(":");
+	if (colonPos != std::string::npos) {
+		hostName = hostName.substr(0, colonPos);
+	}
+	for (std::vector<ServerConfig>::iterator iter = this->config.serverConfigs.begin(); iter != this->config.serverConfigs.end(); iter++) {
+		if (iter->serverName == hostName) {
+			return *iter;
+		}
+	}
+	throw std::runtime_error("Server config not found for host: " + hostName);
+}
+
+bool SocketManager::isMethodAllowed(const std::string& method, const std::string& uri, const ServerConfig& serverConfig) {
+    for (std::vector<LocationConfig>::const_iterator it = serverConfig.locations.begin(); it != serverConfig.locations.end(); ++it) {
+        if (uri.find(it->locationPath) == 0) {
+            for (std::vector<RequestTypes>::const_iterator iter = it->allowedRequestTypes.begin(); iter != it->allowedRequestTypes.end(); ++iter) {
+                if (method == requestTypeToString(*iter)) {
+                    return true;
+                }
+            }
+            // If the URI matches but the method is not allowed, return false immediately
+            return false;
+        }
+    }
+    return false;
+}
+
 void SocketManager::closeConnection(int fd) {
     INFO("Closing socket: " << fd);
     close(fd);
@@ -196,7 +244,7 @@ void SocketManager::closeConnection(int fd) {
 
 
 void SocketManager::addServerFd(int fd) {
-	server_fds.push_back(fd); // Add the server FD to the vector
+	server_fds.push_back(fd);
 }
 
 bool SocketManager::isServerSocket(int fd) {

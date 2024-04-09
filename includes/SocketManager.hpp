@@ -10,7 +10,9 @@
 #include <algorithm>
 #include "Structs.hpp"
 #include "HTTPRequest.hpp"
+#include "HTTPResponse.hpp"
 #include "Logger.hpp"
+#include "Utils.hpp"
 
 class SocketManager {
 	private:
@@ -25,6 +27,8 @@ class SocketManager {
 		void handleClient(int fd);
 		void addServerFd(int fd);
 		bool isServerSocket(int fd);
+		bool isMethodAllowed(const std::string& method, const std::string& uri, const ServerConfig& serverConfig);
+		ServerConfig& getCurrentServer(const HTTPRequest& request);
 
 	public:
 		SocketManager(const HTTPConfig& config);
