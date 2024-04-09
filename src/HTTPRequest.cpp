@@ -1,8 +1,6 @@
 #include "HTTPRequest.hpp"
 
-HTTPRequest::HTTPRequest(const std::string& request) {
-    parseRequest(request);
-}
+HTTPRequest::HTTPRequest() {}
 
 HTTPRequest::~HTTPRequest() {}
 

@@ -16,11 +16,11 @@ class HTTPRequest {
         std::map<std::string, std::string> headers;
         std::string body;
 
-        void parseRequest(const std::string& request);
     public:
-        HTTPRequest(const std::string& request);
+        HTTPRequest();
         ~HTTPRequest();
         
+        void parseRequest(const std::string& request);
         void printValues();
 
         std::string getMethod() const;
