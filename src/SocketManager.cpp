@@ -136,7 +136,7 @@ void SocketManager::handleClient(int fd) {
             processRequestAndRespond(fd);
         }
     } else if (!clientStates[fd].responseComplete) {
-        // If we've already read the complete request but the response wasn't fully sent
+        // TOOD: Resend request if we didnt send everything the first time? will probably have to change this
         sendResponse(fd);
     }
 }
@@ -145,7 +145,7 @@ void SocketManager::handleClient(int fd) {
 
 bool SocketManager::readClientData(int fd) {
 	INFO("Reading client request");
-    char buffer[4096]; // TODO: Change buffer size. To what? Idk
+    char buffer[4096]; // TODO: Change buffer size. To what? Idk lol
     ssize_t bytesRead = recv(fd, buffer, sizeof(buffer), 0);
     if (bytesRead > 0) {
         // Append data to the clients read buffer
@@ -203,14 +203,13 @@ void SocketManager::sendResponse(int fd) {
             clientStates[fd].responseComplete = true;
             // TODO: Depending on HTTP version and headers would have to not close connection potentially?? (e.g. for the Header --> Connection: keep-alive)
             SUCCESS("Response sent successfully. FD: " << fd);
-            closeConnection(fd); // Close connection if done, or implement keep-alive logic here
+            closeConnection(fd);
         } else {
             // TODO: Theres still data left to send, try to send the rest in a another poll iteration??
             WARNING("Partial data sent for FD: " << fd << ". Remaining will be attempted later.");
         }
     } else if (bytesWritten == 0) {
-        // This case usually doesn't happen
-        WARNING("No data was sent, but no error was reported for FD: " << fd);
+        WARNING("No data was sent for FD: " << fd);
     } else {
         ERROR("Failed to send response for FD: " << fd);
         closeConnection(fd); // Close the connection on error
