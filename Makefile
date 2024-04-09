@@ -8,7 +8,7 @@ OBJ_DIR             := ./objs
 
 VPATH               := ./src/ ./src/config-manager/ ./src/utils/ ./src/logger/
 
-SRC                 := main.cpp SocketManager.cpp HTTPRequest.cpp
+SRC                 := main.cpp SocketManager.cpp HTTPRequest.cpp HTTPResponse.cpp
 CONFIG_MANAGER      := ConfigManager.cpp
 LOGGER				:= Logger.cpp
 UTILS			    := utils.cpp
