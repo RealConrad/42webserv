@@ -9,6 +9,53 @@ SocketManager::~SocketManager() {
 	}
 }
 
+/* -------------------------------------------------------------------------- */
+/*                                 Main Server                                */
+/* -------------------------------------------------------------------------- */
+
+void SocketManager::run() {
+	INFO("Running poll()");
+	if (this->fds.size() == 0) {
+		ERROR("No servers configured");
+		return;
+	}
+
+	while (true) {
+		// Poll the sockets for events
+		int num_elements = poll(&this->fds[0], this->fds.size(), this->config.server_timeout_time);
+
+		if (num_elements < 0) {
+			ERROR("poll() error");
+			break;
+		} else if (num_elements == 0) {
+			// WARNING("Socket(s) timed out, trying again");
+			continue;
+		}
+
+		// Iterate over fds to check which ones are ready
+		for (size_t i = 0; i < this->fds.size(); i++) {
+			if (this->fds[i].revents & POLLIN) { // Check if ready for reading
+				if (isServerSocket(this->fds[i].fd)) {
+					acceptNewConnections(this->fds[i].fd);
+				} else {
+					// read data from the client socket, parse into an HTTP request
+					handleClient(this->fds[i].fd);
+				}
+			}
+			// Checks if the connection is still valid
+			if (this->fds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+				closeConnection(this->fds[i].fd);
+				// adjust index after removeing an element
+				i--;
+			}
+		}
+	}
+}
+
+/* -------------------------------------------------------------------------- */
+/*                               Set Up Sockets                               */
+/* -------------------------------------------------------------------------- */
+
 void SocketManager::setupServerSockets() {
 	INFO("Setting up server sockets");
 	for (size_t i = 0; i < this->config.serverConfigs.size(); i++) {
@@ -57,6 +104,10 @@ int SocketManager::createAndBindSocket(int port) {
 	return sockfd;
 }
 
+/* -------------------------------------------------------------------------- */
+/*                                Handle Client                               */
+/* -------------------------------------------------------------------------- */
+
 void SocketManager::acceptNewConnections(int server_fd) {
 	sockaddr_in client_addr;
 	socklen_t clilen = sizeof(client_addr);
@@ -79,108 +130,102 @@ void SocketManager::acceptNewConnections(int server_fd) {
 }
 
 void SocketManager::handleClient(int fd) {
-	INFO("Handling client request. FD: " << fd);
-	HTTPRequest request;
-	if (!this->clientStates[fd].requestComplete) {
-		char buffer[4096]; // TODO: change buffer size
-		ssize_t bytesRead = recv(fd, buffer, sizeof(buffer), 0);
-		if (bytesRead > 0) {
-			// Append data to the clients read buffer
-			this->clientStates[fd].readBuffer.append(buffer, bytesRead);
-
-			// Check if request is complete
-			if (this->clientStates[fd].readBuffer.find("\r\n\r\n") != std::string::npos) {
-				this->clientStates[fd].requestComplete = true;
-				// Parse request and generate response
-				request.parseRequest(this->clientStates[fd].readBuffer);
-			}
-		} else if (bytesRead == 0) {
-			WARNING("Client connection closed");
-			closeConnection(fd);
-			return;
-		} else {
-			ERROR("Failed to read from recv()");
-			closeConnection(fd);
-			return;
-		}
-	}
-
-	// Attempt to write repsonse back to client
-	if (this->clientStates[fd].requestComplete && !this->clientStates[fd].responseComplete) {
-		HTTPResponse response;
-		const ServerConfig& serverConfig = getCurrentServer(request);
-		if (isMethodAllowed(request.getMethod(), request.getURI(), serverConfig)) {
-			response.setHeader("Content-Type", "text/html");
-			response.setBody("<html><body><h1>200 OK</h1><p>Request successful.</p></body></html>");
-			response.setStatusCode(200);
-		} else {
-			// TODO: Generate proper response
-			response.setHeader("Content-Type", "text/html");
-			response.setBody("<html><body><h1>405 Method Not Allowed</h1></body></html>");
-			response.setStatusCode(405); // 405 = Method not allowed
-			ERROR("Method not allowed for server: " << serverConfig.serverName);
-		}
-
-		this->clientStates[fd].writeBuffer = response.convertToString();
-		// Attempt to send the response
-		ssize_t bytesWritten = send(fd, this->clientStates[fd].writeBuffer.c_str(), this->clientStates[fd].writeBuffer.size(), 0);
-		if (bytesWritten >= 0) {
-			// Erase the sent part of the buffer, check if all data was sent
-			this->clientStates[fd].writeBuffer.erase(0, bytesWritten);
-			if (this->clientStates[fd].writeBuffer.empty()) {
-				this->clientStates[fd].responseComplete = true;
-				closeConnection(fd);
-			} else {
-				WARNING("Client write buffer not empty. Did not send all data");
-				// TODO: Here we have to try to send the rest in a subsequent poll iteration??
-			}
-		} else if (bytesWritten == 0) {
-			WARNING("No data sent");
-		} else {
-			// TODO: most likely errors: EWOULDBLOCK or EAGAIN (common in non-blocking mode apparently), how to handle? no idea
-			ERROR("Failed to send response back to client");
-		}
-	}
+    INFO("Handling client request. FD: " << fd);
+    if (!clientStates[fd].requestComplete) {
+        if (readClientData(fd) && clientStates[fd].requestComplete) {
+            processRequestAndRespond(fd);
+        }
+    } else if (!clientStates[fd].responseComplete) {
+        // If we've already read the complete request but the response wasn't fully sent
+        sendResponse(fd);
+    }
 }
 
-void SocketManager::run() {
-	INFO("Running poll()");
-	if (this->fds.size() == 0) {
-		ERROR("No servers configured");
-		return;
-	}
+/* ----------------------------- Handle Requests ---------------------------- */
 
-	while (true) {
-		// Poll the sockets for events
-		int num_elements = poll(&this->fds[0], this->fds.size(), this->config.server_timeout_time);
-
-		if (num_elements < 0) {
-			ERROR("poll() error");
-			break;
-		} else if (num_elements == 0) {
-			// WARNING("Socket(s) timed out, trying again");
-			continue;
-		}
-
-		// Iterate over fds to check which ones are ready
-		for (size_t i = 0; i < this->fds.size(); i++) {
-			if (this->fds[i].revents & POLLIN) { // Check if ready for reading
-				if (isServerSocket(this->fds[i].fd)) {
-					acceptNewConnections(this->fds[i].fd);
-				} else {
-					// read data from the client socket, parse into an HTTP request
-					handleClient(this->fds[i].fd);
-				}
-			}
-			// Checks if the connection is still valid
-			if (this->fds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
-				closeConnection(this->fds[i].fd);
-				// adjust index after removeing an element
-				i--;
-			}
-		}
-	}
+bool SocketManager::readClientData(int fd) {
+	INFO("Reading client request");
+    char buffer[4096]; // TODO: Change buffer size. To what? Idk
+    ssize_t bytesRead = recv(fd, buffer, sizeof(buffer), 0);
+    if (bytesRead > 0) {
+        // Append data to the clients read buffer
+        this->clientStates[fd].readBuffer.append(buffer, bytesRead);
+        // Check if request is complete
+        if (this->clientStates[fd].readBuffer.find("\r\n\r\n") != std::string::npos) {
+            SUCCESS("Successfully read client request");
+			this->clientStates[fd].requestComplete = true;
+            return true;
+        }
+    } else if (bytesRead == 0) {
+        WARNING("Client connection is closed");
+        closeConnection(fd);
+    } else {
+        ERROR("Failed to read from recv()");
+        closeConnection(fd);
+    }
+    return false;
 }
+
+/* ---------------------------- Handle Responses ---------------------------- */
+
+void SocketManager::processRequestAndRespond(int fd) {
+    HTTPRequest request(this->clientStates[fd].readBuffer);
+    HTTPResponse response;
+
+    const ServerConfig& serverConfig = getCurrentServer(request);
+    if (isMethodAllowed(request.getMethod(), request.getURI(), serverConfig)) {
+        prepareResponse(response, 200, "<html><body><h1>200 OK</h1><p>Request successful.</p></body></html>");
+    } else {
+        prepareResponse(response, 405, "<html><body><h1>405 Method Not Allowed</h1></body></html>");
+        ERROR("Method not allowed for server: " + serverConfig.serverName);
+    }
+
+    clientStates[fd].writeBuffer = response.convertToString();
+    sendResponse(fd);
+}
+
+void SocketManager::sendResponse(int fd) {
+    // Check if theres anything to write
+    if (clientStates[fd].writeBuffer.empty()) {
+        WARNING("Nothing to send for FD: " << fd);
+        return;
+    }
+
+    const std::string& toWrite = clientStates[fd].writeBuffer;
+    ssize_t bytesWritten = send(fd, toWrite.c_str(), toWrite.size(), 0);
+
+    if (bytesWritten > 0) {
+        // Erase the sent part of the buffer, check if all data was sent
+        clientStates[fd].writeBuffer.erase(0, bytesWritten);
+
+        // Check if all data was sent
+        if (clientStates[fd].writeBuffer.empty()) {
+            clientStates[fd].responseComplete = true;
+            // TODO: Depending on HTTP version and headers would have to not close connection potentially?? (e.g. for the Header --> Connection: keep-alive)
+            SUCCESS("Response sent successfully. FD: " << fd);
+            closeConnection(fd); // Close connection if done, or implement keep-alive logic here
+        } else {
+            // TODO: Theres still data left to send, try to send the rest in a another poll iteration??
+            WARNING("Partial data sent for FD: " << fd << ". Remaining will be attempted later.");
+        }
+    } else if (bytesWritten == 0) {
+        // This case usually doesn't happen
+        WARNING("No data was sent, but no error was reported for FD: " << fd);
+    } else {
+        ERROR("Failed to send response for FD: " << fd);
+        closeConnection(fd); // Close the connection on error
+    }
+}
+
+void SocketManager::prepareResponse(HTTPResponse& response, int statusCode, const std::string& body) {
+    response.setHeader("Content-Type", "text/html");
+    response.setBody(body);
+    response.setStatusCode(statusCode);
+}
+
+/* -------------------------------------------------------------------------- */
+/*                              Helper Functions                              */
+/* -------------------------------------------------------------------------- */
 
 ServerConfig& SocketManager::getCurrentServer(const HTTPRequest& request) {
 	std::string hostName = request.getHeader("Host");
@@ -206,7 +251,7 @@ bool SocketManager::isMethodAllowed(const std::string& method, const std::string
                     return true;
                 }
             }
-            // If the URI matches but the method is not allowed, return false immediately
+            // If the URI matches but the method is not allowed, return false
             return false;
         }
     }
@@ -241,7 +286,6 @@ void SocketManager::closeConnection(int fd) {
         this->clientStates.erase(it);
     }
 }
-
 
 void SocketManager::addServerFd(int fd) {
 	server_fds.push_back(fd);

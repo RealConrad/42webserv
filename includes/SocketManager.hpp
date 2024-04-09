@@ -30,6 +30,11 @@ class SocketManager {
 		bool isMethodAllowed(const std::string& method, const std::string& uri, const ServerConfig& serverConfig);
 		ServerConfig& getCurrentServer(const HTTPRequest& request);
 
+		void sendResponse(int fd);
+		bool readClientData(int fd);
+		void processRequestAndRespond(int fd);
+		void prepareResponse(HTTPResponse& response, int statusCode, const std::string& body);
+
 	public:
 		SocketManager(const HTTPConfig& config);
 		~SocketManager();
