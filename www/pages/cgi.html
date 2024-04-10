@@ -6,12 +6,24 @@
 <title>GET Page</title>
 <link rel="stylesheet" href="../styles.css">
 </head>
+
+<script>
+
+  const goBack = () => {
+    window.history.back();
+  };
+  
+</script>
+
 <body class="background">
 
 <div class="content">
   This is the CGI page. Here you can simulate a CGI request.
 </div>
-<a href="../index.html" class="back-button">Back</a>
+
+<button onclick="goBack()" class="back-button">
+  Back
+</button>
 
 </body>
 </html>
