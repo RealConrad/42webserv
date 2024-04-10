@@ -135,11 +135,7 @@ void SocketManager::handleClient(int fd) {
         if (readClientData(fd) && clientStates[fd].requestComplete) {
             processRequestAndRespond(fd);
         }
-    } 
-	// else if (!clientStates[fd].responseComplete) {
-    //     // TOOD: Resend request if we didnt send everything the first time? will probably have to change this
-    //     sendResponse(fd);
-    // }
+    }
 }
 
 /* ----------------------------- Handle Requests ---------------------------- */
@@ -171,32 +167,16 @@ bool SocketManager::readClientData(int fd) {
 
 void SocketManager::processRequestAndRespond(int fd) {
     HTTPRequest request(this->clientStates[fd].readBuffer);
-    HTTPResponse response;
-
     const ServerConfig& serverConfig = getCurrentServer(request);
 
-    // Determine the file path based on the request URI
-    std::string requestURI = request.getURI();
-    std::string filePath = serverConfig.rootDirectory + (requestURI == "/" ? "/index.html" : requestURI);
-	DEBUG("REQUESTED URI: " << requestURI);
-	DEBUG("FILE PATH: " << filePath);
-    std::ifstream file(filePath.c_str());
-    if (file) {
-        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-        file.close();
-
-        std::string contentType = "text/html";
-        if (endsWith(requestURI, ".css")) {
-            contentType = "text/css";
-        }
-        response.prepareResponse(response, 200, content, contentType);
-    } else {
-		ERROR("404 Not Found - The reqeusted: '" << filePath << "' was not found");
-        response.prepareResponse(response, 404, "<html><body><h1>404 Not Found</h1><p>The requested file was not found.</p></body></html>", "text/html");
-    }
-
-    clientStates[fd].writeBuffer = response.convertToString();
-    sendResponse(fd);
+	try {
+		HTTPResponse response;
+		response.prepareResponse(request, serverConfig);
+		clientStates[fd].writeBuffer = response.convertToString();
+    	sendResponse(fd);
+	} catch (const std::runtime_error& e) {
+		ERROR(e.what());
+	}
 }
 
 void SocketManager::sendResponse(int fd) {
@@ -246,21 +226,6 @@ ServerConfig& SocketManager::getCurrentServer(const HTTPRequest& request) {
 		}
 	}
 	throw std::runtime_error("Server config not found for host: " + hostName);
-}
-
-bool SocketManager::isMethodAllowed(const std::string& method, const std::string& uri, const ServerConfig& serverConfig) {
-    for (std::vector<LocationConfig>::const_iterator it = serverConfig.locations.begin(); it != serverConfig.locations.end(); ++it) {
-        if (uri.find(it->locationPath) == 0) {
-            for (std::vector<RequestTypes>::const_iterator iter = it->allowedRequestTypes.begin(); iter != it->allowedRequestTypes.end(); ++iter) {
-                if (method == requestTypeToString(*iter)) {
-                    return true;
-                }
-            }
-            // If the URI matches but the method is not allowed, return false
-            return false;
-        }
-    }
-    return false;
 }
 
 void SocketManager::closeConnection(int fd) {

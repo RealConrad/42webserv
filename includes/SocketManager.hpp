@@ -30,7 +30,6 @@ class SocketManager {
 		void handleClient(int fd);
 		void addServerFd(int fd);
 		bool isServerSocket(int fd);
-		bool isMethodAllowed(const std::string& method, const std::string& uri, const ServerConfig& serverConfig);
 		ServerConfig& getCurrentServer(const HTTPRequest& request);
 
 		void sendResponse(int fd);
