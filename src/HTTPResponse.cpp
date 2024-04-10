@@ -14,6 +14,7 @@ void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& Ser
 
     switch (stringToRequestType(method)) {
         case GET:
+            INFO("GET REQUEST RECEIVED");
             handleRequestGET(request, ServerConfig);
             break;
         case POST:
@@ -24,7 +25,6 @@ void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& Ser
             break;
         default:
             // TODO: SEND ERROR BACK TO CLIENT
-            // sendErrorResponse();
             throw std::runtime_error("Method '" + method + "' not implemented");
             break;
     }
@@ -41,7 +41,7 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
         images.push_back("/data/image2.jpg");
         images.push_back("/data/image3.jpg");
 
-        // Generate random image
+        // Get random image
         std::string imagePath = serverConfig.rootDirectory + images[rand() % images.size()];
         std::ifstream file(imagePath.c_str());
         INFO("Serving image: " << imagePath);
@@ -50,6 +50,7 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
             assignResponse(200, content, determineContentType(imagePath));
             file.close();
         } else {
+            WARNING("Image: '" << imagePath << "' not found. Serving 404 page");
             assignPageNotFoundContent(serverConfig);
         }
     } else {
@@ -66,6 +67,7 @@ void HTTPResponse::serveFile(const ServerConfig& serverConfig, const std::string
         assignResponse(200, content, determineContentType(uri));
         file.close();
     } else {
+        WARNING("File '" << filePath << "' not found. Serving 404 page");
         assignPageNotFoundContent(serverConfig);
     }
 }
@@ -82,7 +84,6 @@ void HTTPResponse::assignPageNotFoundContent(const ServerConfig& serverConfig) {
         // Fallback if the NotFound.html file does not exist in given root directory
         notFoundContent = "<html><body><h1>404 Not Found</h1><p>The requested file was not found.</p></body></html>";
     }
-    WARNING("Page not found: " << notFoundPagePath)
     assignResponse(404, notFoundContent, "text/html");
 }
 
