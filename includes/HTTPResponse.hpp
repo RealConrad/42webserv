@@ -18,6 +18,7 @@ class HTTPResponse {
         void setHeader(const std::string& key, const std::string& value);
         void setBody(const std::string& body);
         std::string convertToString() const;
+		void prepareResponse(HTTPResponse& response, int statusCode, const std::string& body, std::string contentType);
 
 };
 

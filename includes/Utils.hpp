@@ -9,6 +9,7 @@
 
 void splitKeyValue(const std::string& line, std::string& key, std::string& value);
 std::string trim(const std::string& str);
+bool endsWith(const std::string& fullString, const std::string& ending);
 
 /* -------------------------------------------------------------------------- */
 /*                                 Conversion                                 */

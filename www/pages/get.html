@@ -6,12 +6,30 @@
 <title>GET Page</title>
 <link rel="stylesheet" href="../styles.css">
 </head>
+
+<script>
+    document.getElementById('getButton').addEventListener('click', function() {
+        fetch('/get-images') // NOT SURE HOW TO DEFINE ENDPOINTS YET
+            .then(response => response.text())
+            .then(data => {
+                console.log(data);
+                // TODO: Update the DOM
+            })
+            .catch(error => console.error('Error:', error));
+    });
+</script>
+
 <body class="background">
+
+<a href="../index.html" class="back-button">Back</a>
 
 <div class="content">
   This is the GET page. Here you can simulate a GET request.
 </div>
-<a href="../index.html" class="back-button">Back</a>
+
+<button id="getButton">
+	GET REQUEST
+</button>
 
 </body>
 </html>

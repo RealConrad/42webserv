@@ -34,3 +34,9 @@ std::string HTTPResponse::convertToString() const {
     responseStream << "\r\n" << this->body;
     return responseStream.str();
 }
+
+void HTTPResponse::prepareResponse(HTTPResponse& response, int statusCode, const std::string& body, std::string contentType) {
+	response.setHeader("Content-Type", contentType);
+    response.setBody(body);
+    response.setStatusCode(statusCode);
+}

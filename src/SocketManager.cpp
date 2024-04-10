@@ -135,10 +135,11 @@ void SocketManager::handleClient(int fd) {
         if (readClientData(fd) && clientStates[fd].requestComplete) {
             processRequestAndRespond(fd);
         }
-    } else if (!clientStates[fd].responseComplete) {
-        // TOOD: Resend request if we didnt send everything the first time? will probably have to change this
-        sendResponse(fd);
-    }
+    } 
+	// else if (!clientStates[fd].responseComplete) {
+    //     // TOOD: Resend request if we didnt send everything the first time? will probably have to change this
+    //     sendResponse(fd);
+    // }
 }
 
 /* ----------------------------- Handle Requests ---------------------------- */
@@ -173,11 +174,25 @@ void SocketManager::processRequestAndRespond(int fd) {
     HTTPResponse response;
 
     const ServerConfig& serverConfig = getCurrentServer(request);
-    if (isMethodAllowed(request.getMethod(), request.getURI(), serverConfig)) {
-        prepareResponse(response, 200, "<html><body><h1>200 OK</h1><p>Request successful.</p></body></html>");
+
+    // Determine the file path based on the request URI
+    std::string requestURI = request.getURI();
+    std::string filePath = serverConfig.rootDirectory + (requestURI == "/" ? "/index.html" : requestURI);
+	DEBUG("REQUESTED URI: " << requestURI);
+	DEBUG("FILE PATH: " << filePath);
+    std::ifstream file(filePath.c_str());
+    if (file) {
+        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        file.close();
+
+        std::string contentType = "text/html";
+        if (endsWith(requestURI, ".css")) {
+            contentType = "text/css";
+        }
+        response.prepareResponse(response, 200, content, contentType);
     } else {
-        prepareResponse(response, 405, "<html><body><h1>405 Method Not Allowed</h1></body></html>");
-        ERROR("Method not allowed for server: " + serverConfig.serverName);
+		ERROR("404 Not Found - The reqeusted: '" << filePath << "' was not found");
+        response.prepareResponse(response, 404, "<html><body><h1>404 Not Found</h1><p>The requested file was not found.</p></body></html>", "text/html");
     }
 
     clientStates[fd].writeBuffer = response.convertToString();
@@ -190,10 +205,7 @@ void SocketManager::sendResponse(int fd) {
         WARNING("Nothing to send for FD: " << fd);
         return;
     }
-
-    const std::string& toWrite = clientStates[fd].writeBuffer;
-    ssize_t bytesWritten = send(fd, toWrite.c_str(), toWrite.size(), 0);
-
+    ssize_t bytesWritten = send(fd, clientStates[fd].writeBuffer.c_str(), clientStates[fd].writeBuffer.size(), 0);
     if (bytesWritten > 0) {
         // Erase the sent part of the buffer, check if all data was sent
         clientStates[fd].writeBuffer.erase(0, bytesWritten);
@@ -212,14 +224,8 @@ void SocketManager::sendResponse(int fd) {
         WARNING("No data was sent for FD: " << fd);
     } else {
         ERROR("Failed to send response for FD: " << fd);
-        closeConnection(fd); // Close the connection on error
+        closeConnection(fd);
     }
-}
-
-void SocketManager::prepareResponse(HTTPResponse& response, int statusCode, const std::string& body) {
-    response.setHeader("Content-Type", "text/html");
-    response.setBody(body);
-    response.setStatusCode(statusCode);
 }
 
 /* -------------------------------------------------------------------------- */
