@@ -8,28 +8,47 @@
 </head>
 
 <script>
-    document.getElementById('getButton').addEventListener('click', function() {
-        fetch('/get-images') // NOT SURE HOW TO DEFINE ENDPOINTS YET
-            .then(response => response.text())
-            .then(data => {
-                console.log(data);
-                // TODO: Update the DOM
-            })
-            .catch(error => console.error('Error:', error));
-    });
+const getImage = () => {
+    console.log('GET request initiated');
+    fetch('/get-images')
+        .then(response => response.blob())
+        .then(blob => {
+            const imageUrl = URL.createObjectURL(blob);
+            const img = document.getElementById('displayedImage');
+            img.src = imageUrl;
+            img.style.display = 'block'; // Make the image visible
+        })
+        .catch(error => {
+            console.error('Error:', error)
+            alert('Error: ' + error.message)
+        });
+};
+
+const goBack = () => {
+    window.history.back();
+};
+
 </script>
 
 <body class="background">
 
-<a href="../index.html" class="back-button">Back</a>
+<button onclick="goBack()" class="back-button">
+  Back
+</button>
 
 <div class="content">
   This is the GET page. Here you can simulate a GET request.
 </div>
 
-<button id="getButton">
-	GET REQUEST
-</button>
+<div style="padding-top: 20px; padding-bottom: 10px;">
+    <button onclick="getImage()">
+        GET IMAGE
+    </button>
+</div>
+
+<div class="image-container">
+    <img id="displayedImage" class="image" style="display:none;">
+</div>
 
 </body>
 </html>
