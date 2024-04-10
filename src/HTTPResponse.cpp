@@ -6,9 +6,8 @@ HTTPResponse::~HTTPResponse() {}
 
 void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& ServerConfig) {
     std::string method = request.getMethod();
-    std::string uri = request.getURI();
 
-    if (!isMethodAllowed(method, uri, ServerConfig)) {
+    if (!isMethodAllowed(method, request.getURI(), ServerConfig)) {
         throw std::runtime_error("Method '" + method + "' not allowed for server '" + ServerConfig.serverName + "'");
     }
 
