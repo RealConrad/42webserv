@@ -14,21 +14,38 @@ SocketManager::~SocketManager() {
 /* -------------------------------------------------------------------------- */
 
 void SocketManager::run() {
-	INFO("Running poll()");
 	if (this->fds.size() == 0) {
-		ERROR("No servers configured");
+		ERROR("No servers configured, cannot run poll()!");
 		return;
 	}
 
+	INFO("Running poll()");
 	while (true) {
 		// Poll the sockets for events
 		int num_elements = poll(&this->fds[0], this->fds.size(), this->config.server_timeout_time);
 
 		if (num_elements < 0) {
-			ERROR("poll() error");
-			break;
+			ERROR("poll() failed: " << strerror(errno));
+			switch (errno) {
+				case EBADF:
+					ERROR("EBADF - One or more of the file descriptors was not valid.");
+					break;
+				case EINTR:
+					ERROR("EINTR - Interrupted by a signal handler before any of the file descriptors became ready.");
+					break;
+				case EINVAL:
+					ERROR("EINVAL - The nfds value exceeds the RLIMIT_NOFILE value, or the timeout value was invalid.");
+					break;
+				case ENOMEM:
+					ERROR("ENOMEM - Not enough space to allocate file descriptor tables.");
+					break;
+				default:
+					ERROR("Unknown error.");
+					break;
+			}
+			continue;
 		} else if (num_elements == 0) {
-			// WARNING("Socket(s) timed out, trying again");
+			// 	DEBUG("*");
 			continue;
 		}
 
@@ -42,8 +59,13 @@ void SocketManager::run() {
 					handleClient(this->fds[i].fd);
 				}
 			}
+			if (this->fds[i].revents & POLLOUT) { // Ready for writing
+				INFO("Sending response back to client");
+				sendResponse(this->fds[i].fd);
+			}
 			// Checks if the connection is still valid
 			if (this->fds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+
 				closeConnection(this->fds[i].fd);
 				// adjust index after removeing an element
 				i--;
@@ -124,7 +146,7 @@ void SocketManager::acceptNewConnections(int server_fd) {
 	fcntl(newsockfd, F_SETFL, flags | O_NONBLOCK);
 
 	// Add the new socket to the fds vector to monitor it with poll()
-	struct pollfd new_pfd = {newsockfd, POLLIN, 0};
+	struct pollfd new_pfd = {newsockfd, POLLIN | POLLOUT, 0};
 	this->fds.push_back(new_pfd);
 	SUCCESS("Server socket " << server_fd << " Accepted new connection from " << &client_addr);
 }
@@ -137,7 +159,7 @@ void SocketManager::handleClient(int fd) {
         }
     } else if (!clientStates[fd].responseComplete) {
         // TOOD: Resend request if we didnt send everything the first time? will probably have to change this
-        sendResponse(fd);
+        // sendResponse(fd);
     }
 }
 
@@ -181,7 +203,7 @@ void SocketManager::processRequestAndRespond(int fd) {
     }
 
     clientStates[fd].writeBuffer = response.convertToString();
-    sendResponse(fd);
+	request.printValues();
 }
 
 void SocketManager::sendResponse(int fd) {

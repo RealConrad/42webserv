@@ -75,12 +75,12 @@ std::string HTTPRequest::getHeader(const std::string& name) const {
 }
 
 void HTTPRequest::printValues() {
-    std::cout  << "Method: " << getMethod() << std::endl;
-    std::cout  << "URI: " << getURI() << std::endl;
-    std::cout  << "Version: " << getVersion() << std::endl;
-    std::cout  << "Body: " << getBody() << std::endl;
-    std::cout  << "Headers: " << std::endl;
+	DEBUG("Method: " << getMethod() << "\t\t\t\t\t");
+	DEBUG("URI: " << getURI()<< "\t\t\t\t\t");
+	DEBUG("Version: " << getVersion()<< "\t\t\t\t\t");
+	DEBUG("Headers: "<< "\t\t\t\t\t");
     for (std::map<std::string, std::string>::iterator iter = this->headers.begin(); iter != this->headers.end(); iter++) {
-        std::cout << iter->first << ": " << iter->second << std::endl;
+		DEBUG(iter->first << ": " << iter->second<< "\t\t\t\t\t");
     }
+	DEBUG("Body: " << getBody()<< "\t\t\t\t\t");
 }

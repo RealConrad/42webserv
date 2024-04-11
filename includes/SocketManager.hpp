@@ -6,6 +6,7 @@
 #include <unistd.h> 
 #include <fcntl.h>
 #include <poll.h> // poll
+#include <errno.h> // error numbers for poll
 #include <netinet/in.h> // sockaddr_in
 #include <algorithm>
 #include "Structs.hpp"
@@ -34,7 +35,7 @@ class SocketManager {
 		bool readClientData(int fd);
 		void processRequestAndRespond(int fd);
 		void prepareResponse(HTTPResponse& response, int statusCode, const std::string& body);
-
+		
 	public:
 		SocketManager(const HTTPConfig& config);
 		~SocketManager();
