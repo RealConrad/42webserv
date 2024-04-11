@@ -6,12 +6,49 @@
 <title>GET Page</title>
 <link rel="stylesheet" href="../styles.css">
 </head>
+
+<script>
+const getImage = () => {
+    console.log('GET request initiated');
+    fetch('/get-images')
+        .then(response => response.blob())
+        .then(blob => {
+            const imageUrl = URL.createObjectURL(blob);
+            const img = document.getElementById('displayedImage');
+            img.src = imageUrl;
+            img.style.display = 'block'; // Make the image visible
+        })
+        .catch(error => {
+            console.error('Error:', error)
+            alert('Error: ' + error.message)
+        });
+};
+
+const goBack = () => {
+    window.history.back();
+};
+
+</script>
+
 <body class="background">
+
+<button onclick="goBack()" class="back-button">
+  Back
+</button>
 
 <div class="content">
   This is the GET page. Here you can simulate a GET request.
 </div>
-<a href="../index.html" class="back-button">Back</a>
+
+<div style="padding-top: 20px; padding-bottom: 10px;">
+    <button onclick="getImage()">
+        GET IMAGE
+    </button>
+</div>
+
+<div class="image-container">
+    <img id="displayedImage" class="image" style="display:none;">
+</div>
 
 </body>
 </html>
