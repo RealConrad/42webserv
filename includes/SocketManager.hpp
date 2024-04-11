@@ -28,14 +28,14 @@ class SocketManager {
 		void acceptNewConnections(int server_fd);
 		void closeConnection(int fd);
 		int createAndBindSocket(int port);
-		void handleClient(int fd);
+		void handleClientRequest(int fd);
 		void addServerFd(int fd);
 		bool isServerSocket(int fd);
 		ServerConfig& getCurrentServer(const HTTPRequest& request);
 
 		void sendResponse(int fd);
 		bool readClientData(int fd);
-		void processRequestAndRespond(int fd);
+		void processRequest(int fd);
 	public:
 		SocketManager(const HTTPConfig& config);
 		~SocketManager();

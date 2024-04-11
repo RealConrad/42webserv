@@ -51,21 +51,28 @@ void SocketManager::run() {
 
 		// Iterate over fds to check which ones are ready
 		for (size_t i = 0; i < this->fds.size(); i++) {
+			if (this->fds[i].revents & POLLOUT 
+			&& !isServerSocket(this->fds[i].fd)
+			&& this->clientStates[this->fds[i].fd].responseComplete == false) { // Ready for writing
+				INFO("Sending response back to client");
+				sendResponse(this->fds[i].fd);
+			}
 			if (this->fds[i].revents & POLLIN) { // Check if ready for reading
 				if (isServerSocket(this->fds[i].fd)) {
 					acceptNewConnections(this->fds[i].fd);
 				} else {
 					// read data from the client socket, parse into an HTTP request
-					handleClient(this->fds[i].fd);
+					handleClientRequest(this->fds[i].fd);
 				}
-			}
-			if (this->fds[i].revents & POLLOUT) { // Ready for writing
-				INFO("Sending response back to client");
-				sendResponse(this->fds[i].fd);
 			}
 			// Checks if the connection is still valid
 			if (this->fds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
-
+				if (this->fds[i].revents & (POLLERR))
+					ERROR("operation on the file descriptor failed unexpectedly");
+				if (this->fds[i].revents & (POLLHUP))
+					ERROR("client closed the connection");
+				if (this->fds[i].revents & (POLLNVAL))
+					ERROR("file descriptor is not open or invalid");
 				closeConnection(this->fds[i].fd);
 				// adjust index after removeing an element
 				i--;
@@ -151,11 +158,11 @@ void SocketManager::acceptNewConnections(int server_fd) {
 	SUCCESS("Server socket " << server_fd << " Accepted new connection from " << &client_addr);
 }
 
-void SocketManager::handleClient(int fd) {
+void SocketManager::handleClientRequest(int fd) {
     INFO("Handling client request. FD: " << fd);
     if (!clientStates[fd].requestComplete) {
         if (readClientData(fd) && clientStates[fd].requestComplete) {
-            processRequestAndRespond(fd);
+            processRequest(fd);
         }
     }
 }
@@ -187,15 +194,16 @@ bool SocketManager::readClientData(int fd) {
 
 /* ---------------------------- Handle Responses ---------------------------- */
 
-void SocketManager::processRequestAndRespond(int fd) {
+void SocketManager::processRequest(int fd) {
     HTTPRequest request(this->clientStates[fd].readBuffer);
     const ServerConfig& serverConfig = getCurrentServer(request);
 
 	try {
 		HTTPResponse response;
 		response.prepareResponse(request, serverConfig);
+		clientStates[fd].responseComplete = false;
 		clientStates[fd].writeBuffer = response.convertToString();
-    	sendResponse(fd);
+    	// sendResponse(fd);
 	} catch (const std::runtime_error& e) {
 		ERROR(e.what());
 	}
@@ -205,6 +213,7 @@ void SocketManager::sendResponse(int fd) {
     // Check if theres anything to write
     if (clientStates[fd].writeBuffer.empty()) {
         WARNING("Nothing to send for FD: " << fd);
+		// closeConnection(fd); // not sure ?	 i think
         return;
     }
     ssize_t bytesWritten = send(fd, clientStates[fd].writeBuffer.c_str(), clientStates[fd].writeBuffer.size(), 0);
@@ -217,7 +226,7 @@ void SocketManager::sendResponse(int fd) {
             clientStates[fd].responseComplete = true;
             // TODO: Depending on HTTP version and headers would have to not close connection potentially?? (e.g. for the Header --> Connection: keep-alive)
             SUCCESS("Response sent successfully. FD: " << fd);
-            closeConnection(fd);
+            // closeConnection(fd);
         } else {
             // TODO: Theres still data left to send, try to send the rest in a another poll iteration??
             WARNING("Partial data sent for FD: " << fd << ". Remaining will be attempted later.");
