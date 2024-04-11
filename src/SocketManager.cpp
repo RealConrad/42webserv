@@ -157,9 +157,6 @@ void SocketManager::handleClient(int fd) {
         if (readClientData(fd) && clientStates[fd].requestComplete) {
             processRequestAndRespond(fd);
         }
-    } else if (!clientStates[fd].responseComplete) {
-        // TOOD: Resend request if we didnt send everything the first time? will probably have to change this
-        // sendResponse(fd);
     }
 }
 
@@ -192,18 +189,16 @@ bool SocketManager::readClientData(int fd) {
 
 void SocketManager::processRequestAndRespond(int fd) {
     HTTPRequest request(this->clientStates[fd].readBuffer);
-    HTTPResponse response;
-
     const ServerConfig& serverConfig = getCurrentServer(request);
-    if (isMethodAllowed(request.getMethod(), request.getURI(), serverConfig)) {
-        prepareResponse(response, 200, "<html><body><h1>200 OK</h1><p>Request successful.</p></body></html>");
-    } else {
-        prepareResponse(response, 405, "<html><body><h1>405 Method Not Allowed</h1></body></html>");
-        ERROR("Method not allowed for server: " + serverConfig.serverName);
-    }
 
-    clientStates[fd].writeBuffer = response.convertToString();
-	request.printValues();
+	try {
+		HTTPResponse response;
+		response.prepareResponse(request, serverConfig);
+		clientStates[fd].writeBuffer = response.convertToString();
+    	sendResponse(fd);
+	} catch (const std::runtime_error& e) {
+		ERROR(e.what());
+	}
 }
 
 void SocketManager::sendResponse(int fd) {
@@ -212,10 +207,7 @@ void SocketManager::sendResponse(int fd) {
         WARNING("Nothing to send for FD: " << fd);
         return;
     }
-
-    const std::string& toWrite = clientStates[fd].writeBuffer;
-    ssize_t bytesWritten = send(fd, toWrite.c_str(), toWrite.size(), 0);
-
+    ssize_t bytesWritten = send(fd, clientStates[fd].writeBuffer.c_str(), clientStates[fd].writeBuffer.size(), 0);
     if (bytesWritten > 0) {
         // Erase the sent part of the buffer, check if all data was sent
         clientStates[fd].writeBuffer.erase(0, bytesWritten);
@@ -234,14 +226,8 @@ void SocketManager::sendResponse(int fd) {
         WARNING("No data was sent for FD: " << fd);
     } else {
         ERROR("Failed to send response for FD: " << fd);
-        closeConnection(fd); // Close the connection on error
+        closeConnection(fd);
     }
-}
-
-void SocketManager::prepareResponse(HTTPResponse& response, int statusCode, const std::string& body) {
-    response.setHeader("Content-Type", "text/html");
-    response.setBody(body);
-    response.setStatusCode(statusCode);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -262,21 +248,6 @@ ServerConfig& SocketManager::getCurrentServer(const HTTPRequest& request) {
 		}
 	}
 	throw std::runtime_error("Server config not found for host: " + hostName);
-}
-
-bool SocketManager::isMethodAllowed(const std::string& method, const std::string& uri, const ServerConfig& serverConfig) {
-    for (std::vector<LocationConfig>::const_iterator it = serverConfig.locations.begin(); it != serverConfig.locations.end(); ++it) {
-        if (uri.find(it->locationPath) == 0) {
-            for (std::vector<RequestTypes>::const_iterator iter = it->allowedRequestTypes.begin(); iter != it->allowedRequestTypes.end(); ++iter) {
-                if (method == requestTypeToString(*iter)) {
-                    return true;
-                }
-            }
-            // If the URI matches but the method is not allowed, return false
-            return false;
-        }
-    }
-    return false;
 }
 
 void SocketManager::closeConnection(int fd) {

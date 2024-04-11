@@ -5,10 +5,13 @@
 #include <map>
 #include <unistd.h> 
 #include <fcntl.h>
-#include <poll.h> // poll
+#include <poll.h>
 #include <errno.h> // error numbers for poll
 #include <netinet/in.h> // sockaddr_in
 #include <algorithm>
+#include <fstream>
+#include <streambuf>
+
 #include "Structs.hpp"
 #include "HTTPRequest.hpp"
 #include "HTTPResponse.hpp"
@@ -28,14 +31,11 @@ class SocketManager {
 		void handleClient(int fd);
 		void addServerFd(int fd);
 		bool isServerSocket(int fd);
-		bool isMethodAllowed(const std::string& method, const std::string& uri, const ServerConfig& serverConfig);
 		ServerConfig& getCurrentServer(const HTTPRequest& request);
 
 		void sendResponse(int fd);
 		bool readClientData(int fd);
 		void processRequestAndRespond(int fd);
-		void prepareResponse(HTTPResponse& response, int statusCode, const std::string& body);
-		
 	public:
 		SocketManager(const HTTPConfig& config);
 		~SocketManager();
