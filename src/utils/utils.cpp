@@ -105,3 +105,15 @@ void printHTTPConfig(const HTTPConfig& config) {
 	std::cout << std::endl;
 	std::cout << "FINISHED PRINTING HTTP CONFIG!" << std::endl;
 }
+
+bool *getServer(void) {
+	static bool	serverRunCondition = true;
+	return (&serverRunCondition);
+}
+
+void setServer(bool value) {
+	bool	*exit_code;
+
+	exit_code = getServer();
+	*exit_code = value;
+}

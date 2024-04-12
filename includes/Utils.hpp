@@ -26,4 +26,8 @@ int convertStringToInt(const std::string& str);
 void printHTTPConfig(const HTTPConfig& config);
 
 
+
+void setServer(bool value);
+bool *getServer(void);
+
 #endif

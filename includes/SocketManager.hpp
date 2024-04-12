@@ -28,12 +28,12 @@ class SocketManager {
 		void acceptNewConnections(int server_fd);
 		void closeConnection(int fd);
 		int createAndBindSocket(int port);
-		void handleClientRequest(int fd);
+		void handleClientRequest(int i);
 		void addServerFd(int fd);
 		bool isServerSocket(int fd);
 		ServerConfig& getCurrentServer(const HTTPRequest& request);
 
-		void sendResponse(int fd);
+		void sendResponse(int i);
 		bool readClientData(int fd);
 		void processRequest(int fd);
 	public:

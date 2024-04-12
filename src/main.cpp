@@ -2,8 +2,11 @@
 #include "SocketManager.hpp"
 #include "Logger.hpp"
 #include <stdexcept>
+#include <signal.h>
+#include "Utils.hpp"
 
 int main(int argc, char** argv) {
+
 	Logger::initialize(true);
 	INFO("Starting program");
     if (argc > 2) {

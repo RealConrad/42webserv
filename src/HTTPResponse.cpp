@@ -86,8 +86,16 @@ void HTTPResponse::assignPageNotFoundContent(const ServerConfig& serverConfig) {
     assignResponse(404, notFoundContent, "text/html");
 }
 
+std::string intToString(size_t value) { //TODO move to utils
+    std::stringstream ss; // Create a stringstream object
+    ss << value;          // Insert the integer into the stream
+    return ss.str();      // Return the string version of the integer
+}
+
 void HTTPResponse::assignResponse(int statusCode, const std::string& body, std::string contentType) {
 	setHeader("Content-Type", contentType);
+	setHeader("Content-Length", intToString(body.size() - 1));
+	setHeader("Connection", "keep-alive"); // TODO depending on client request
     setBody(body);
     setStatusCode(statusCode);
 }

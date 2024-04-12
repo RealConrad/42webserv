@@ -1,5 +1,7 @@
 #include "SocketManager.hpp"
 
+bool g_run; 
+
 SocketManager::SocketManager(const HTTPConfig& config): config(config) {}
 
 SocketManager::~SocketManager() {
@@ -13,14 +15,20 @@ SocketManager::~SocketManager() {
 /*                                 Main Server                                */
 /* -------------------------------------------------------------------------- */
 
+void stopServer(int){
+	g_run = false;
+}
+
 void SocketManager::run() {
 	if (this->fds.size() == 0) {
 		ERROR("No servers configured, cannot run poll()!");
 		return;
 	}
+	g_run = true;
+	signal(SIGINT, stopServer);
 
 	INFO("Running poll()");
-	while (true) {
+	while (g_run) {
 		// Poll the sockets for events
 		int num_elements = poll(&this->fds[0], this->fds.size(), this->config.server_timeout_time);
 
@@ -51,19 +59,20 @@ void SocketManager::run() {
 
 		// Iterate over fds to check which ones are ready
 		for (size_t i = 0; i < this->fds.size(); i++) {
-			if (this->fds[i].revents & POLLOUT 
-			&& !isServerSocket(this->fds[i].fd)
-			&& this->clientStates[this->fds[i].fd].responseComplete == false) { // Ready for writing
-				INFO("Sending response back to client");
-				sendResponse(this->fds[i].fd);
-			}
 			if (this->fds[i].revents & POLLIN) { // Check if ready for reading
 				if (isServerSocket(this->fds[i].fd)) {
 					acceptNewConnections(this->fds[i].fd);
 				} else {
 					// read data from the client socket, parse into an HTTP request
-					handleClientRequest(this->fds[i].fd);
+					handleClientRequest(i);
 				}
+			}
+			if (this->fds[i].revents & POLLOUT 
+			&& !isServerSocket(this->fds[i].fd)) {
+			// && this->clientStates[this->fds[i].fd].responseComplete == false) { // Ready for writing
+				
+				INFO("Sending response back to client from socket " << this->fds[i].fd);
+				sendResponse(i);
 			}
 			// Checks if the connection is still valid
 			if (this->fds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
@@ -153,12 +162,14 @@ void SocketManager::acceptNewConnections(int server_fd) {
 	fcntl(newsockfd, F_SETFL, flags | O_NONBLOCK);
 
 	// Add the new socket to the fds vector to monitor it with poll()
-	struct pollfd new_pfd = {newsockfd, POLLIN | POLLOUT, 0};
+	struct pollfd new_pfd = {newsockfd, POLLIN, 0};
 	this->fds.push_back(new_pfd);
 	SUCCESS("Server socket " << server_fd << " Accepted new connection from " << &client_addr);
 }
 
-void SocketManager::handleClientRequest(int fd) {
+void SocketManager::handleClientRequest(int i) {
+	int fd = this->fds[i].fd;
+	this->fds[i].events |= POLLOUT;
     INFO("Handling client request. FD: " << fd);
     if (!clientStates[fd].requestComplete) {
         if (readClientData(fd) && clientStates[fd].requestComplete) {
@@ -170,15 +181,16 @@ void SocketManager::handleClientRequest(int fd) {
 /* ----------------------------- Handle Requests ---------------------------- */
 
 bool SocketManager::readClientData(int fd) {
-	INFO("Reading client request");
-    char buffer[4096]; // TODO: Change buffer size. To what? Idk lol
+	INFO("Reading client request:");
+    char buffer[4096 * 100]; // TODO: Change buffer size. To what? Idk lol
     ssize_t bytesRead = recv(fd, buffer, sizeof(buffer), 0);
+	DEBUG(std::endl << buffer << std::endl);
     if (bytesRead > 0) {
         // Append data to the clients read buffer
         this->clientStates[fd].readBuffer.append(buffer, bytesRead);
         // Check if request is complete
         if (this->clientStates[fd].readBuffer.find("\r\n\r\n") != std::string::npos) {
-            SUCCESS("Successfully read client request");
+            SUCCESS("Succe ssfully read client request");
 			this->clientStates[fd].requestComplete = true;
             return true;
         }
@@ -203,17 +215,21 @@ void SocketManager::processRequest(int fd) {
 		response.prepareResponse(request, serverConfig);
 		clientStates[fd].responseComplete = false;
 		clientStates[fd].writeBuffer = response.convertToString();
+		// DEBUG("Prepared Response: " << std::endl << clientStates[fd].writeBuffer << std::endl);
     	// sendResponse(fd);
 	} catch (const std::runtime_error& e) {
 		ERROR(e.what());
 	}
 }
 
-void SocketManager::sendResponse(int fd) {
+void SocketManager::sendResponse(int i) {
+	int fd = this->fds[i].fd;
+
     // Check if theres anything to write
     if (clientStates[fd].writeBuffer.empty()) {
         WARNING("Nothing to send for FD: " << fd);
-		// closeConnection(fd); // not sure ?	 i think
+		usleep(10000);
+		this->fds[i].events = POLLIN;
         return;
     }
     ssize_t bytesWritten = send(fd, clientStates[fd].writeBuffer.c_str(), clientStates[fd].writeBuffer.size(), 0);
@@ -223,7 +239,8 @@ void SocketManager::sendResponse(int fd) {
 
         // Check if all data was sent
         if (clientStates[fd].writeBuffer.empty()) {
-            clientStates[fd].responseComplete = true;
+			this->fds[i].events = POLLIN;
+            // clientStates[fd].responseComplete = true;
             // TODO: Depending on HTTP version and headers would have to not close connection potentially?? (e.g. for the Header --> Connection: keep-alive)
             SUCCESS("Response sent successfully. FD: " << fd);
             // closeConnection(fd);
