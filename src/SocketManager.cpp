@@ -24,66 +24,56 @@ void SocketManager::run() {
 		ERROR("No servers configured, cannot run poll()!");
 		return;
 	}
+
 	g_run = true;
 	signal(SIGINT, stopServer);
 
 	INFO("Running poll()");
 	while (g_run) {
-		// Poll the sockets for events
-		int num_elements = poll(&this->fds[0], this->fds.size(), this->config.server_timeout_time);
-
-		if (num_elements < 0) {
-			ERROR("poll() failed: " << strerror(errno));
+		int pollRevents = poll(&this->fds[0], this->fds.size(), this->config.server_timeout_time);
+		if (pollRevents < 0) {
 			switch (errno) {
 				case EBADF:
-					ERROR("EBADF - One or more of the file descriptors was not valid.");
+					ERROR("poll() failed: EBADF - One or more of the file descriptors was not valid.");
 					break;
 				case EINTR:
-					ERROR("EINTR - Interrupted by a signal handler before any of the file descriptors became ready.");
+					ERROR("poll() failed: EINTR - Interrupted by a signal handler before any of the file descriptors became ready.");
 					break;
 				case EINVAL:
-					ERROR("EINVAL - The nfds value exceeds the RLIMIT_NOFILE value, or the timeout value was invalid.");
+					ERROR("poll() failed: EINVAL - The nfds value exceeds the RLIMIT_NOFILE value, or the timeout value was invalid.");
 					break;
 				case ENOMEM:
-					ERROR("ENOMEM - Not enough space to allocate file descriptor tables.");
+					ERROR("poll() failed: ENOMEM - Not enough space to allocate file descriptor tables.");
 					break;
 				default:
-					ERROR("Unknown error.");
+					ERROR("poll() failed: Unknown error.");
 					break;
 			}
 			continue;
-		} else if (num_elements == 0) {
-			// 	DEBUG("*");
+		} else if (pollRevents == 0) {
 			continue;
 		}
-
-		// Iterate over fds to check which ones are ready
 		for (size_t i = 0; i < this->fds.size(); i++) {
-			if (this->fds[i].revents & POLLIN) { // Check if ready for reading
+			if (this->fds[i].revents & POLLIN) {
+				INFO("Recived a request on a socket *" << this->fds[i].fd << "*");
 				if (isServerSocket(this->fds[i].fd)) {
 					acceptNewConnections(this->fds[i].fd);
 				} else {
-					// read data from the client socket, parse into an HTTP request
-					handleClientRequest(i);
+					handleClientRequest(fds[i]);
 				}
 			}
-			if (this->fds[i].revents & POLLOUT 
-			&& !isServerSocket(this->fds[i].fd)) {
-			// && this->clientStates[this->fds[i].fd].responseComplete == false) { // Ready for writing
-				
-				INFO("Sending response back to client from socket " << this->fds[i].fd);
-				sendResponse(i);
+			if (this->fds[i].revents & POLLOUT && !isServerSocket(this->fds[i].fd)) {
+				INFO("Sending response back to client from socket *" << this->fds[i].fd << "*");
+				sendResponse(fds[i]);
 			}
-			// Checks if the connection is still valid
 			if (this->fds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
 				if (this->fds[i].revents & (POLLERR))
-					ERROR("operation on the file descriptor failed unexpectedly");
+					ERROR("POLLERR : operation on the file descriptor failed unexpectedly on socket *" << fds[i].fd << "*");
 				if (this->fds[i].revents & (POLLHUP))
-					ERROR("client closed the connection");
+					ERROR("POLLHUP : client closed the connection on socket *" << fds[i].fd << "*");
 				if (this->fds[i].revents & (POLLNVAL))
-					ERROR("file descriptor is not open or invalid");
+					ERROR("POLLNVAL : file descriptor is not open or invalid on socket *" << fds[i].fd << "*");
 				closeConnection(this->fds[i].fd);
-				// adjust index after removeing an element
 				i--;
 			}
 		}
@@ -113,15 +103,12 @@ int SocketManager::createAndBindSocket(int port) {
 		return -1;
 	}
 
-	// Make socket non blocking
-	int flags = fcntl(sockfd, F_GETFL, 0);
-	if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) < 0) {
+	if (fcntl(sockfd, F_SETFL, O_NONBLOCK) < 0) {
 		closeConnection(sockfd);
-		ERROR("Failed to set to non blocking mode for socket: " << sockfd);
+		ERROR("Failed to set to non blocking mode for socket: *" << sockfd << "*");
 		return -1;
 	}
 
-	// bind
 	struct sockaddr_in serv_addr;
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_addr.s_addr = INADDR_ANY;
@@ -132,13 +119,12 @@ int SocketManager::createAndBindSocket(int port) {
 		return -1;
 	}
 
-	// listen
 	if (listen(sockfd, SOMAXCONN) < 0) {
 		closeConnection(sockfd);
-		ERROR("Failed to initialize listen for socket: " << sockfd);
+		ERROR("Failed to initialize listen for socket: *" << sockfd << "*");
 		return -1;
 	}
-	SUCCESS("Socket "<< sockfd << " is listening on port " << port);
+	SUCCESS("Socket *"<< sockfd << "* is listening on port " << port);
 	return sockfd;
 }
 
@@ -157,105 +143,80 @@ void SocketManager::acceptNewConnections(int server_fd) {
 
 	this->clientStates[newsockfd] = ClientState();
 
-	// Make the new socket non-blocking
-	int flags = fcntl(newsockfd, F_GETFL, 0);
-	fcntl(newsockfd, F_SETFL, flags | O_NONBLOCK);
+	fcntl(newsockfd, F_SETFL, O_NONBLOCK);
 
-	// Add the new socket to the fds vector to monitor it with poll()
 	struct pollfd new_pfd = {newsockfd, POLLIN, 0};
 	this->fds.push_back(new_pfd);
-	SUCCESS("Server socket " << server_fd << " Accepted new connection from " << &client_addr);
+	SUCCESS("Server socket *" << server_fd << "* Accepted new connection on socket *" << newsockfd << "*");
 }
 
-void SocketManager::handleClientRequest(int i) {
-	int fd = this->fds[i].fd;
-	this->fds[i].events |= POLLOUT;
-    INFO("Handling client request. FD: " << fd);
-    if (!clientStates[fd].requestComplete) {
-        if (readClientData(fd) && clientStates[fd].requestComplete) {
-            processRequest(fd);
-        }
-    }
+void SocketManager::handleClientRequest(pollfd &fd) {
+	fd.events |= POLLOUT;
+	if (!clientStates[fd.fd].requestComplete) {
+		if (readClientData(fd.fd) && clientStates[fd.fd].requestComplete) {
+			processRequest(fd.fd);
+		}
+	}
 }
 
 /* ----------------------------- Handle Requests ---------------------------- */
 
 bool SocketManager::readClientData(int fd) {
 	INFO("Reading client request:");
-    char buffer[4096 * 100]; // TODO: Change buffer size. To what? Idk lol
-    ssize_t bytesRead = recv(fd, buffer, sizeof(buffer), 0);
-	DEBUG(std::endl << buffer << std::endl);
-    if (bytesRead > 0) {
-        // Append data to the clients read buffer
-        this->clientStates[fd].readBuffer.append(buffer, bytesRead);
-        // Check if request is complete
-        if (this->clientStates[fd].readBuffer.find("\r\n\r\n") != std::string::npos) {
-            SUCCESS("Succe ssfully read client request");
+	char buffer[4096 * 10];
+	ssize_t bytesRead = recv(fd, buffer, sizeof(buffer), 0);
+	if (bytesRead > 0) {
+		this->clientStates[fd].readBuffer.append(buffer, bytesRead);
+		if (this->clientStates[fd].readBuffer.find("\r\n\r\n") != std::string::npos) {
 			this->clientStates[fd].requestComplete = true;
-            return true;
-        }
-    } else if (bytesRead == 0) {
-        WARNING("Client connection is closed");
-        closeConnection(fd);
-    } else {
-        ERROR("Failed to read from recv()");
-        closeConnection(fd);
-    }
-    return false;
+			return true;
+		}
+	} else if (bytesRead == 0) {
+		WARNING("Client connection is closed");
+		closeConnection(fd);
+	} else {
+		ERROR("Failed to read from recv()");
+		closeConnection(fd);
+	}
+	return false;
 }
 
 /* ---------------------------- Handle Responses ---------------------------- */
 
 void SocketManager::processRequest(int fd) {
-    HTTPRequest request(this->clientStates[fd].readBuffer);
-    const ServerConfig& serverConfig = getCurrentServer(request);
+	HTTPRequest request(this->clientStates[fd].readBuffer);
+	const ServerConfig& serverConfig = getCurrentServer(request);
 
 	try {
 		HTTPResponse response;
 		response.prepareResponse(request, serverConfig);
 		clientStates[fd].responseComplete = false;
 		clientStates[fd].writeBuffer = response.convertToString();
-		// DEBUG("Prepared Response: " << std::endl << clientStates[fd].writeBuffer << std::endl);
-    	// sendResponse(fd);
 	} catch (const std::runtime_error& e) {
 		ERROR(e.what());
 	}
 }
 
-void SocketManager::sendResponse(int i) {
-	int fd = this->fds[i].fd;
-
-    // Check if theres anything to write
-    if (clientStates[fd].writeBuffer.empty()) {
-        WARNING("Nothing to send for FD: " << fd);
-		usleep(10000);
-		this->fds[i].events = POLLIN;
-        return;
-    }
-    ssize_t bytesWritten = send(fd, clientStates[fd].writeBuffer.c_str(), clientStates[fd].writeBuffer.size(), 0);
-    if (bytesWritten > 0) {
-        // Erase the sent part of the buffer, check if all data was sent
-        clientStates[fd].writeBuffer.erase(0, bytesWritten);
-
-        // Check if all data was sent
-        if (clientStates[fd].writeBuffer.empty()) {
-			this->fds[i].events = POLLIN;
-            // clientStates[fd].responseComplete = true;
-            // TODO: Depending on HTTP version and headers would have to not close connection potentially?? (e.g. for the Header --> Connection: keep-alive)
-            SUCCESS("Response sent successfully. FD: " << fd);
-            // closeConnection(fd);
-        } else {
-            // TODO: Theres still data left to send, try to send the rest in a another poll iteration??
-            WARNING("Partial data sent for FD: " << fd << ". Remaining will be attempted later.");
-        }
-    } else if (bytesWritten == 0) {
-        WARNING("No data was sent for FD: " << fd);
-    } else {
-        ERROR("Failed to send response for FD: " << fd);
-        closeConnection(fd);
-    }
+void SocketManager::sendResponse(pollfd &fd) {
+	if (clientStates[fd.fd].writeBuffer.empty()) {
+		WARNING("Nothing to send on socket *" << fd.fd << "*");
+		fd.events = POLLIN;
+		return;
+	}
+	ssize_t bytesWritten = send(fd.fd, clientStates[fd.fd].writeBuffer.c_str(), clientStates[fd.fd].writeBuffer.size(), 0);
+	if (bytesWritten > 0) {
+		clientStates[fd.fd].writeBuffer.erase(0, bytesWritten);
+		if (clientStates[fd.fd].writeBuffer.empty()) {
+			fd.events = POLLIN;
+			SUCCESS("Response sent successfully on socket *" << fd.fd << "*");
+		}
+	} else if (bytesWritten == 0) {
+		WARNING("No data was sent for socket *" << fd.fd << "*");
+	} else {
+		ERROR("Failed to send response for socket *" << fd.fd << "*");
+		closeConnection(fd.fd);
+	}
 }
-
 /* -------------------------------------------------------------------------- */
 /*                              Helper Functions                              */
 /* -------------------------------------------------------------------------- */
@@ -263,7 +224,6 @@ void SocketManager::sendResponse(int i) {
 ServerConfig& SocketManager::getCurrentServer(const HTTPRequest& request) {
 	std::string hostName = request.getHeader("Host");
 
-	// Get rid of potential port number from host if present
 	size_t colonPos = hostName.find(":");
 	if (colonPos != std::string::npos) {
 		hostName = hostName.substr(0, colonPos);
@@ -277,32 +237,29 @@ ServerConfig& SocketManager::getCurrentServer(const HTTPRequest& request) {
 }
 
 void SocketManager::closeConnection(int fd) {
-    INFO("Closing socket: " << fd);
-    close(fd);
+	INFO("Closing socket: " << fd);
+	close(fd);
 
-    // Remove from fds vector
-    for (std::vector<struct pollfd>::iterator it = this->fds.begin(); it != this->fds.end();) {
-        if (it->fd == fd) {
-            it = this->fds.erase(it); // Erase returns the next iterator
-        } else {
-            ++it;
-        }
-    }
+	for (std::vector<struct pollfd>::iterator it = this->fds.begin(); it != this->fds.end();) {
+		if (it->fd == fd) {
+			it = this->fds.erase(it);
+		} else {
+			++it;
+		}
+	}
 
-    // Remove from server_fds vector
-    for (std::vector<int>::iterator it = this->server_fds.begin(); it != this->server_fds.end();) {
-        if (*it == fd) {
-            it = this->server_fds.erase(it);
-        } else {
-            ++it;
-        }
-    }
+	for (std::vector<int>::iterator it = this->server_fds.begin(); it != this->server_fds.end();) {
+		if (*it == fd) {
+			it = this->server_fds.erase(it);
+		} else {
+			++it;
+		}
+	}
 
-    // Remove from clientStates map
-    std::map<int, ClientState>::iterator it = this->clientStates.find(fd);
-    if (it != this->clientStates.end()) {
-        this->clientStates.erase(it);
-    }
+	std::map<int, ClientState>::iterator it = this->clientStates.find(fd);
+	if (it != this->clientStates.end()) {
+		this->clientStates.erase(it);
+	}
 }
 
 void SocketManager::addServerFd(int fd) {

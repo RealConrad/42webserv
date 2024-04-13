@@ -6,8 +6,8 @@
 #include <unistd.h> 
 #include <fcntl.h>
 #include <poll.h>
-#include <errno.h> // error numbers for poll
-#include <netinet/in.h> // sockaddr_in
+#include <errno.h>
+#include <netinet/in.h>
 #include <algorithm>
 #include <fstream>
 #include <streambuf>
@@ -28,12 +28,12 @@ class SocketManager {
 		void acceptNewConnections(int server_fd);
 		void closeConnection(int fd);
 		int createAndBindSocket(int port);
-		void handleClientRequest(int i);
+		void handleClientRequest(pollfd &fd);
 		void addServerFd(int fd);
 		bool isServerSocket(int fd);
 		ServerConfig& getCurrentServer(const HTTPRequest& request);
 
-		void sendResponse(int i);
+		void sendResponse(pollfd &fd);
 		bool readClientData(int fd);
 		void processRequest(int fd);
 	public:
