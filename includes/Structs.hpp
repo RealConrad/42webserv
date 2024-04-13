@@ -23,6 +23,8 @@ struct ClientState {
 	std::string writeBuffer;
 	bool keepAlive;
 	time_t lastActivity;
+	bool closeConnection;
+	ClientState() : closeConnection(false){};
 };
 
 struct LocationConfig {
@@ -43,6 +45,7 @@ struct ServerConfig {
 struct HTTPConfig {
 	std::vector<ServerConfig> serverConfigs;
 	int server_timeout_time;
+	int keepAliveTimeout;
 };
 
 #endif

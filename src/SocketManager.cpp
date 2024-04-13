@@ -50,8 +50,6 @@ void SocketManager::run() {
 					break;
 			}
 			continue;
-		} else if (pollRevents == 0) {
-			continue;
 		}
 		for (size_t i = 0; i < this->fds.size(); i++) {
 			if (this->fds[i].revents & POLLIN) {
@@ -77,13 +75,15 @@ void SocketManager::run() {
 					WARNING("POLLHUP : client closed the connection on socket *" << fds[i].fd << "*");
 				if (this->fds[i].revents & (POLLNVAL))
 					WARNING("POLLNVAL : file descriptor is not open or invalid on socket *" << fds[i].fd << "*");
-				closeConnection(this->fds[i].fd);
-				i--;
+				clientStates[fds[i].fd].closeConnection = true;
 			}
 			time_t now;
 			time(&now);
-			if (difftime(now, clientStates[fds[i].fd].lastActivity) > 10 && !isServerSocket(this->fds[i].fd)){
+			if ((difftime(now, clientStates[fds[i].fd].lastActivity) > this->config.keepAliveTimeout) && !isServerSocket(this->fds[i].fd)){
 				WARNING("TIMEOUT on socket *" << fds[i].fd << "*");
+				clientStates[fds[i].fd].closeConnection = true;
+			}
+			if (clientStates[fds[i].fd].closeConnection == true){
 				closeConnection(this->fds[i].fd);
 				i--;
 			}
@@ -174,7 +174,7 @@ bool SocketManager::readClientData(int fd) {
 		}
 	} else if (bytesRead < 0) {
 		ERROR("Failed to read from recv()");
-		closeConnection(fd);
+		clientStates[fd].closeConnection = true;
 	}
 	return false;
 }
@@ -183,6 +183,11 @@ bool SocketManager::readClientData(int fd) {
 
 void SocketManager::processRequest(int fd) {
 	HTTPRequest request(this->clientStates[fd].readBuffer);
+	std::string keepAlive = request.getHeader("Connection");
+	if (keepAlive == "keep-alive")
+		clientStates[fd].keepAlive = true;
+	else
+		clientStates[fd].keepAlive = false;
 	const ServerConfig& serverConfig = getCurrentServer(request);
 
 	try {
@@ -200,19 +205,22 @@ void SocketManager::sendResponse(pollfd &fd) {
 		fd.events = POLLIN;
 		return;
 	}
-	BLOCK(clientStates[fd.fd].writeBuffer);
 	ssize_t bytesWritten = send(fd.fd, clientStates[fd.fd].writeBuffer.c_str(), clientStates[fd.fd].writeBuffer.size(), 0);
 	if (bytesWritten > 0) {
 		clientStates[fd.fd].writeBuffer.erase(0, bytesWritten);
 		if (clientStates[fd.fd].writeBuffer.empty()) {
 			fd.events = POLLIN;
 			SUCCESS("Response sent successfully on socket *" << fd.fd << "*");
+			if(clientStates[fd.fd].keepAlive == false){
+				WARNING("Non-keep-alive connection termination on socket *" << fd.fd << "*");
+				clientStates[fd.fd].closeConnection = true;
+			}
 		}
 	} else if (bytesWritten == 0) {
 		WARNING("No data was sent for socket *" << fd.fd << "*");
 	} else {
 		ERROR("Failed to send response for socket *" << fd.fd << "*");
-		closeConnection(fd.fd);
+		clientStates[fd.fd].closeConnection = true;
 	}
 }
 /* -------------------------------------------------------------------------- */

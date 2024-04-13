@@ -89,7 +89,7 @@ void HTTPResponse::assignResponse(int statusCode, const std::string& body, std::
 	setHeader("Content-Type", contentType);
 	setHeader("Content-Length", ::toString(body.size() - 1));
 	setHeader("Connection", "keep-alive");
-	setHeader("Keep-Alive", "timeout=60");
+	setHeader("Keep-Alive", "timeout=60, max=50");
 	setBody(body);
 	setStatusCode(statusCode);
 }
