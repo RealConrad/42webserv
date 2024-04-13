@@ -35,10 +35,9 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 		INFO("/get-images endpoint called for server: " << serverConfig.serverName);
 		// TODO: CHANGE THIS TO READ FROM A DIRECTORY MAYBE?
 		std::vector<std::string> images;
-		images.push_back("/data/image1.jpg");
-		images.push_back("/data/image2.jpg");
-		images.push_back("/data/image3.jpg");
-
+		images.push_back("/images/image1.jpg");
+		images.push_back("/images/image2.jpg");
+		images.push_back("/images/image3.jpg");
 		// Get random image
 		std::string imagePath = serverConfig.rootDirectory + images[rand() % images.size()];
 		std::ifstream file(imagePath.c_str());
