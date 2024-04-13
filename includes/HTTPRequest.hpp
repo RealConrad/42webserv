@@ -22,7 +22,6 @@ class HTTPRequest {
         ~HTTPRequest();
         
         void parseRequest(const std::string& request);
-        void printValues();
 
         std::string getMethod() const;
         std::string getURI() const;
