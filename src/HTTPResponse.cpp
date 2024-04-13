@@ -16,7 +16,7 @@ void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& Ser
 			handleRequestGET(request, ServerConfig);
 			break;
 		case POST:
-			handleRequestPOST(request, ServerConfig);
+			// handleRequestPOST(request, ServerConfig);
 			break;
 		case DELETE:
 			ERROR("DELETE REQUEST NOT IMPLEMENTED YET!");
