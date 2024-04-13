@@ -183,6 +183,7 @@ bool SocketManager::readClientData(int fd) {
 
 void SocketManager::processRequest(int fd) {
 	HTTPRequest request(this->clientStates[fd].readBuffer);
+	BLOCK(this->clientStates[fd].readBuffer);
 	std::string keepAlive = request.getHeader("Connection");
 	if (keepAlive == "keep-alive")
 		clientStates[fd].keepAlive = true;
