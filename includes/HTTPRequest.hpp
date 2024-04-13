@@ -7,6 +7,7 @@
 #include <map>
 #include <algorithm>
 #include "Logger.hpp"
+#include "Utils.hpp"
 
 class HTTPRequest {
     private:
@@ -15,7 +16,15 @@ class HTTPRequest {
         std::string version;
         std::map<std::string, std::string> headers;
         std::string body;
+        std::string fileName;
+        std::string fileContentType;
 
+        void parseHeaders(std::istringstream& stream);
+        void parseBody(std::istringstream& stream);
+        std::string extractHeaderValue(const std::string& header, const std::string& key);
+        void parseMultipartPart(const std::string& part);
+        void parseMultipartBody(std::istringstream& stream, const std::string& boundary);
+        std::string extractBoundary(const std::string& contentType);
     public:
         HTTPRequest();
         HTTPRequest(const std::string& request);
@@ -28,6 +37,8 @@ class HTTPRequest {
         std::string getVersion() const;
         std::string getHeader(const std::string& name) const;
         std::string getBody() const;
+        std::string getFileName() const;
+        std::string getFileContentType() const;
 };
 
 #endif
