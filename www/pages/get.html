@@ -8,24 +8,31 @@
 </head>
 
 <script>
+
 const getImage = () => {
-    console.log('GET request initiated');
-    fetch('/get-images')
-        .then(response => response.blob())
-        .then(blob => {
-            const imageUrl = URL.createObjectURL(blob);
-            const img = document.getElementById('displayedImage');
-            img.src = imageUrl;
-            img.style.display = 'block'; // Make the image visible
-        })
-        .catch(error => {
-            console.error('Error:', error)
-            alert('Error: ' + error.message)
-        });
+	console.log('GET request initiated');
+	fetch('/get-images')
+		.then(response => response.blob())
+		.then(blob => {
+			const imageUrl = URL.createObjectURL(blob);
+			const img = document.getElementById('displayedImage');
+			img.src = imageUrl;
+			// This for some reason fixes the images not loading correctly. I dont fully know why
+			// This should behave the same as forcefully reloading the DOM, but everything else I tried did not work.
+			img.onload = () => {
+				const src = img.src;
+				img.src = '';
+				img.src = src;
+			};
+		})
+		.catch(error => {
+			console.error('Error:', error)
+			alert('Error: ' + error.message)
+		});
 };
 
 const goBack = () => {
-    window.history.back();
+	window.history.back();
 };
 
 </script>
@@ -41,13 +48,13 @@ const goBack = () => {
 </div>
 
 <div style="padding-top: 20px; padding-bottom: 10px;">
-    <button onclick="getImage()">
-        GET IMAGE
-    </button>
+	<button onclick="getImage()">
+		GET IMAGE
+	</button>
 </div>
 
 <div class="image-container">
-    <img id="displayedImage" class="image" style="display:none;">
+	<img id="displayedImage" class="image">
 </div>
 
 </body>
