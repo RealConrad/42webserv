@@ -103,7 +103,7 @@ int SocketManager::createAndBindSocket(int port) {
 		return -1;
 	}
 
-	if (fcntl(sockfd, F_SETFL, O_NONBLOCK) < 0) {
+	if (fcntl(sockfd, F_SETFL, O_NONBLOCK | FD_CLOEXEC) < 0) {
 		closeConnection(sockfd);
 		ERROR("Failed to set to non blocking mode for socket: *" << sockfd << "*");
 		return -1;
@@ -143,7 +143,7 @@ void SocketManager::acceptNewConnections(int server_fd) {
 
 	this->clientStates[newsockfd] = ClientState();
 
-	fcntl(newsockfd, F_SETFL, O_NONBLOCK);
+	fcntl(newsockfd, F_SETFL, O_NONBLOCK | FD_CLOEXEC);
 
 	struct pollfd new_pfd = {newsockfd, POLLIN, 0};
 	this->fds.push_back(new_pfd);
