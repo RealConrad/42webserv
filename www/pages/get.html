@@ -17,7 +17,6 @@ const getImage = () => {
 			const imageUrl = URL.createObjectURL(blob);
 			const img = document.getElementById('displayedImage');
 			img.src = imageUrl;
-			// This for some reason fixes the images not loading correctly. I dont fully know why
 			// This should behave the same as forcefully reloading the DOM, but everything else I tried did not work.
 			img.onload = () => {
 				const src = img.src;
