@@ -88,7 +88,8 @@ void HTTPResponse::assignPageNotFoundContent(const ServerConfig& serverConfig) {
 void HTTPResponse::assignResponse(int statusCode, const std::string& body, std::string contentType) {
 	setHeader("Content-Type", contentType);
 	setHeader("Content-Length", ::toString(body.size() - 1));
-	setHeader("Connection", "keep-alive"); // TODO depending on client request
+	setHeader("Connection", "keep-alive");
+	setHeader("Keep-Alive", "timeout=60");
 	setBody(body);
 	setStatusCode(statusCode);
 }

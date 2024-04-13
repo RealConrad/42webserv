@@ -8,6 +8,9 @@ bool Logger::successEnabled;
 bool Logger::infoEnabled;
 bool Logger::warningEnabled;
 bool Logger::errorEnabled;
+bool Logger::useFileLine;
+bool Logger::useTimestamp;
+bool Logger::useLevel;
 
 Logger::Logger() {}
 
@@ -19,106 +22,124 @@ void Logger::initialize(bool enableLogging, bool enableLogFile) {
 	infoEnabled = enableLogging;
 	warningEnabled = enableLogging;
 	errorEnabled = enableLogging;
-    setUseColour(true);
-    output = &std::clog;
+	useFileLine = enableLogging;
+	useTimestamp = enableLogging;
+	useLevel = enableLogging;
+	setUseColour(true);
+	output = &std::clog;
 
-    if (enableLogFile) {
-        setLogFile("webserv.log");
-    }
+	if (enableLogFile) {
+		setLogFile("webserv.log");
+	}
 }
 
 void Logger::setUseColour(bool value) {
-    useColour = value;
+	useColour = value;
 }
 
 void Logger::hide(LogLevel level){
-    if (level == DEBUG)
+	if (level == DEBUG)
 		debugEnabled = false;
-    else if (level == SUCCESS)
+	else if (level == SUCCESS)
 		successEnabled = false;
-    else if (level == INFO)
+	else if (level == INFO)
 		infoEnabled = false;
-    else if (level == WARNING)
+	else if (level == WARNING)
 		warningEnabled = false;
-    else if (level == ERROR)
+	else if (level == ERROR)
 		errorEnabled = false;
 }
 
+void Logger::hideFileLine(){
+	useFileLine = false;
+}
+void Logger::hideLevel(){
+	useLevel = false;
+}
+void Logger::hideTimestamp(){
+	useTimestamp = false;
+}
+
 void Logger::log(const std::string& message, const char* file, int line, LogLevel level) {
-    if (level == DEBUG && !debugEnabled)
-        return;
-    if (level == SUCCESS && !successEnabled)
-        return;
-    if (level == INFO && !infoEnabled)
-        return;
-    if (level == WARNING && !warningEnabled)
-        return;
-    if (level == ERROR && !errorEnabled)
-        return;
+	if (level == DEBUG && !debugEnabled)
+		return;
+	if (level == SUCCESS && !successEnabled)
+		return;
+	if (level == INFO && !infoEnabled)
+		return;
+	if (level == WARNING && !warningEnabled)
+		return;
+	if (level == ERROR && !errorEnabled)
+		return;
 
-    // Get current time
-    std::time_t t = std::time(NULL);
-    std::tm* localTime = std::localtime(&t); // Gets the current UTC timezone
+	std::time_t t = std::time(NULL);
+	std::tm* localTime = std::localtime(&t);
 
-    // Buffer to hold the time string
-    char timeStr[9]; // HH:MM:SS + null terminator
-    std::strftime(timeStr, sizeof(timeStr), "%H:%M:%S", localTime);
-    std::string colorStart = "";
-    std::string colorEnd = "";
-    if (useColour) {
-        colorStart = getColor(level);
-        colorEnd = "\033[0m";
-    }
-
-    *output << colorStart << "[" << timeStr << "] " << "[" << getLevelString(level) << "]  \t" << message << colorEnd << " [" << file << ":" << line << "]" << std::endl;
+	char timeStr[9];
+	std::strftime(timeStr, sizeof(timeStr), "%H:%M:%S", localTime);
+	std::string colorStart = "";
+	std::string colorEnd = "";
+	if (useColour) {
+		colorStart = getColor(level);
+		colorEnd = "\033[0m";
+	}
+	*output << colorStart;
+	if (useTimestamp)
+		*output << "[" << timeStr << "] ";
+	if (useLevel)
+		*output << "[" << getLevelString(level) << "]  \t";
+	*output << message << colorEnd;
+	if (useFileLine)
+		*output << " [" << file << ":" << line << "]";
+	*output << std::endl;
 }
 
 
 void Logger::setLogFile(const std::string& filename) {
-    if (fileStream.is_open())
-        fileStream.close();
+	if (fileStream.is_open())
+		fileStream.close();
 
-    fileStream.open(filename.c_str());
-    if (fileStream.fail()) {
-        std::cerr << "Failed to open log file: " << filename << std::endl;
-        output = &std::cout;
-        setUseColour(true); // Enable when logging out to console
-    } else {
-        output = &fileStream;
-        setUseColour(false); // Disable color when logging to a file
-    }
+	fileStream.open(filename.c_str());
+	if (fileStream.fail()) {
+		std::cerr << "Failed to open log file: " << filename << std::endl;
+		output = &std::cout;
+		setUseColour(true);
+	} else {
+		output = &fileStream;
+		setUseColour(false);
+	}
 }
 
 std::string Logger::getLevelString(LogLevel level) {
-    switch (level) {
-        case SUCCESS:
-            return "SUCCESS";
-        case DEBUG:
-            return "DEBUG";
-        case INFO:
-            return "INFO";
-        case WARNING:
-            return "WARNING";
-        case ERROR:
-            return "ERROR";
-        default:
-            return "UNKNOWN";
-    }
+	switch (level) {
+		case SUCCESS:
+			return "SUCCESS";
+		case DEBUG:
+			return "DEBUG";
+		case INFO:
+			return "INFO";
+		case WARNING:
+			return "WARNING";
+		case ERROR:
+			return "ERROR";
+		default:
+			return "UNKNOWN";
+	}
 }
 
 std::string Logger::getColor(LogLevel level) {
-    switch (level) {
-        case DEBUG:
-            return "\033[38;5;208m"; // Orange
-        case SUCCESS:
-            return "\033[32m"; // Green
-        case INFO:
-            return "\033[34m"; // Blue
-        case WARNING:
-            return "\033[33m"; // Yellow
-        case ERROR:
-            return "\033[31m"; // Red
-        default:
-            return "\033[0m";  // Reset
-    }
+	switch (level) {
+		case DEBUG:
+			return "\033[38;5;208m"; // Orange
+		case SUCCESS:
+			return "\033[32m"; // Green
+		case INFO:
+			return "\033[34m"; // Blue
+		case WARNING:
+			return "\033[33m"; // Yellow
+		case ERROR:
+			return "\033[31m"; // Red
+		default:
+			return "\033[0m";  // Reset
+	}
 }

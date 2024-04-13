@@ -35,6 +35,7 @@ void HTTPRequest::parseRequest(const std::string& request) {
 		requestStream.read(&body[0], length);
 	}
 	SUCCESS("Recived HTTP Request: " << method << " on " << uri);
+	BLOCK(request);
 }
 
 /* -------------------------------------------------------------------------- */

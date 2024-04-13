@@ -56,23 +56,34 @@ void SocketManager::run() {
 		for (size_t i = 0; i < this->fds.size(); i++) {
 			if (this->fds[i].revents & POLLIN) {
 				INFO("Recived a request on a socket *" << this->fds[i].fd << "*");
+				time(&clientStates[fds[i].fd].lastActivity);
 				if (isServerSocket(this->fds[i].fd)) {
 					acceptNewConnections(this->fds[i].fd);
 				} else {
-					handleClientRequest(fds[i]);
+					fds[i].events |= POLLOUT;
+					if (readClientData(fds[i].fd))
+						processRequest(fds[i].fd);
 				}
 			}
 			if (this->fds[i].revents & POLLOUT && !isServerSocket(this->fds[i].fd)) {
 				INFO("Sending response back to client from socket *" << this->fds[i].fd << "*");
+				time(&clientStates[fds[i].fd].lastActivity);
 				sendResponse(fds[i]);
 			}
 			if (this->fds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
 				if (this->fds[i].revents & (POLLERR))
-					ERROR("POLLERR : operation on the file descriptor failed unexpectedly on socket *" << fds[i].fd << "*");
+					WARNING("POLLERR : operation on the file descriptor failed unexpectedly on socket *" << fds[i].fd << "*");
 				if (this->fds[i].revents & (POLLHUP))
-					ERROR("POLLHUP : client closed the connection on socket *" << fds[i].fd << "*");
+					WARNING("POLLHUP : client closed the connection on socket *" << fds[i].fd << "*");
 				if (this->fds[i].revents & (POLLNVAL))
-					ERROR("POLLNVAL : file descriptor is not open or invalid on socket *" << fds[i].fd << "*");
+					WARNING("POLLNVAL : file descriptor is not open or invalid on socket *" << fds[i].fd << "*");
+				closeConnection(this->fds[i].fd);
+				i--;
+			}
+			time_t now;
+			time(&now);
+			if (difftime(now, clientStates[fds[i].fd].lastActivity) > 10 && !isServerSocket(this->fds[i].fd)){
+				WARNING("TIMEOUT on socket *" << fds[i].fd << "*");
 				closeConnection(this->fds[i].fd);
 				i--;
 			}
@@ -147,34 +158,21 @@ void SocketManager::acceptNewConnections(int server_fd) {
 
 	struct pollfd new_pfd = {newsockfd, POLLIN, 0};
 	this->fds.push_back(new_pfd);
+	time(&clientStates[newsockfd].lastActivity);
 	SUCCESS("Server socket *" << server_fd << "* Accepted new connection on socket *" << newsockfd << "*");
-}
-
-void SocketManager::handleClientRequest(pollfd &fd) {
-	fd.events |= POLLOUT;
-	if (!clientStates[fd.fd].requestComplete) {
-		if (readClientData(fd.fd) && clientStates[fd.fd].requestComplete) {
-			processRequest(fd.fd);
-		}
-	}
 }
 
 /* ----------------------------- Handle Requests ---------------------------- */
 
 bool SocketManager::readClientData(int fd) {
-	INFO("Reading client request:");
 	char buffer[4096 * 10];
 	ssize_t bytesRead = recv(fd, buffer, sizeof(buffer), 0);
 	if (bytesRead > 0) {
 		this->clientStates[fd].readBuffer.append(buffer, bytesRead);
 		if (this->clientStates[fd].readBuffer.find("\r\n\r\n") != std::string::npos) {
-			this->clientStates[fd].requestComplete = true;
 			return true;
 		}
-	} else if (bytesRead == 0) {
-		WARNING("Client connection is closed");
-		closeConnection(fd);
-	} else {
+	} else if (bytesRead < 0) {
 		ERROR("Failed to read from recv()");
 		closeConnection(fd);
 	}
@@ -190,7 +188,6 @@ void SocketManager::processRequest(int fd) {
 	try {
 		HTTPResponse response;
 		response.prepareResponse(request, serverConfig);
-		clientStates[fd].responseComplete = false;
 		clientStates[fd].writeBuffer = response.convertToString();
 	} catch (const std::runtime_error& e) {
 		ERROR(e.what());
@@ -203,6 +200,7 @@ void SocketManager::sendResponse(pollfd &fd) {
 		fd.events = POLLIN;
 		return;
 	}
+	BLOCK(clientStates[fd.fd].writeBuffer);
 	ssize_t bytesWritten = send(fd.fd, clientStates[fd.fd].writeBuffer.c_str(), clientStates[fd.fd].writeBuffer.size(), 0);
 	if (bytesWritten > 0) {
 		clientStates[fd.fd].writeBuffer.erase(0, bytesWritten);
