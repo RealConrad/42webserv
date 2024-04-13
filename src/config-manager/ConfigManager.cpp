@@ -30,7 +30,7 @@ void ConfigManager::parseConfigFile(std::string configFilePath) {
     }
     configFile.close();
     validateConfiguration();
-    SUCCESS("Parsing was successful");
+    SUCCESS("Parsing Config was successful");
 }
 
 void ConfigManager::initServerConfig(ServerConfig& serverConfig) {
@@ -68,6 +68,8 @@ void ConfigManager::parseHttpSection(std::ifstream& configFile, std::string& lin
             if (value.empty())
                 throw std::runtime_error("Value is missing for 'server_timeout_time'");
             this->httpConfig.server_timeout_time = convertStringToInt(value);
+		} else if (key == "keepalive_timeout") {
+        	this->httpConfig.keepAliveTimeout = convertStringToInt(value);
         } else if (line == "server {") {
             ServerConfig serverConfig;
             initServerConfig(serverConfig);
