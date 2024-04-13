@@ -16,7 +16,7 @@ void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& Ser
 			handleRequestGET(request, ServerConfig);
 			break;
 		case POST:
-			ERROR("POST REQUEST NOT IMPLEMENTED YET!");
+			handleRequestPOST(request, ServerConfig);
 			break;
 		case DELETE:
 			ERROR("DELETE REQUEST NOT IMPLEMENTED YET!");
@@ -52,6 +52,14 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 		}
 	} else {
 		serveFile(serverConfig, requestURI);
+	}
+}
+
+void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerConfig& serverConfig) {
+	std::string requestURI = request.getURI();
+
+	if (requestURI == "/upload-file") {
+		INFO("File upload endpoint called for server: " << serverConfig.serverName);
 	}
 }
 

@@ -27,6 +27,7 @@ class HTTPResponse {
         bool isMethodAllowed(const std::string& method, const std::string& uri, const ServerConfig& serverConfig);
         void serveFile(const ServerConfig& serverConfig, const std::string& uri);
         void handleRequestGET(const HTTPRequest& request, const ServerConfig& serverConfig);
+		void handleRequestPOST(const HTTPRequest& request, const ServerConfig& serverConfig);
         void assignPageNotFoundContent(const ServerConfig& serverConfig);
         
         /* -------------------------------------------------------------------------- */
