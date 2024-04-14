@@ -29,7 +29,7 @@ class HTTPRequest {
         HTTPRequest();
         HTTPRequest(const std::string& request);
         ~HTTPRequest();
-        
+
         void parseRequest(const std::string& request);
 
         std::string getMethod() const;

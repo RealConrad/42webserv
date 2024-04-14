@@ -26,7 +26,7 @@
     formData.append('file', file);
 
     try {
-      const response = await fetch('/upload-file', {
+      const response = await fetch('/upload-file', { // TODO update this URL
         method: 'POST',
         body: formData
       });
@@ -39,7 +39,7 @@
       alert('File uploaded successfully!');
     } catch (error) {
       console.error('Error:', error);
-      alert(error.message);
+      alert("Error: " + error.message);
     }
   };
 
