@@ -4,6 +4,7 @@
 #include <map>
 #include <string>
 #include <sstream>
+#include <fstream>
 #include <cstdlib>
 #include <ctime>
 #include "Logger.hpp"

@@ -16,7 +16,7 @@ void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& Ser
 			handleRequestGET(request, ServerConfig);
 			break;
 		case POST:
-			// handleRequestPOST(request, ServerConfig);
+			handleRequestPOST(request, ServerConfig);
 			break;
 		case DELETE:
 			ERROR("DELETE REQUEST NOT IMPLEMENTED YET!");
@@ -56,11 +56,41 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 }
 
 void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerConfig& serverConfig) {
-	std::string requestURI = request.getURI();
+    std::string requestURI = request.getURI();
 
-	if (requestURI == "/upload-file") {
-		INFO("File upload endpoint called for server: " << serverConfig.serverName);
-	}
+    if (requestURI == "/upload-file") {
+        INFO("File upload endpoint called for server: " << serverConfig.serverName);
+        std::string fileContent = request.getBody();
+        std::string fileName = request.getFileName();
+		DEBUG("File content: " << fileContent);
+		DEBUG("File name: " << fileName);
+        if (fileContent.empty() || fileName.empty()) {
+            ERROR("No file content or filename provided");
+            assignResponse(400, "Bad Request: No file content or filename provided", "text/html");
+            return;
+        }
+
+        std::string savePath = serverConfig.rootDirectory + "/uploads/" + fileName;
+        std::ofstream outFile(savePath.c_str());
+        if (outFile) {
+            outFile.write(fileContent.c_str(), fileContent.size());
+            outFile.close();
+
+            if (!outFile.fail()) {
+                INFO("File uploaded successfully: " + savePath);
+                assignResponse(200, "File uploaded successfully", "text/html");
+            } else {
+                ERROR("Failed to write file to disk");
+                assignResponse(500, "Internal Server Error. Failed to write file.", "text/html");
+            }
+        } else {
+            ERROR("Unable to open file for writing: " + savePath);
+            assignResponse(500, "Internal Server Error. Unable to open file for writing", "text/html");
+        }
+    } else {
+        WARNING("Unsupported POST request for URI: " + requestURI);
+        assignResponse(404, "The requested URL was not found on this server", "text/html");
+    }
 }
 
 void HTTPResponse::serveFile(const ServerConfig& serverConfig, const std::string& uri) {

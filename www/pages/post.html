@@ -24,9 +24,10 @@
 
     const formData = new FormData();
     formData.append('file', file);
+    const url = origin + '/upload-file';
 
     try {
-      const response = await fetch('/upload-file', { // TODO update this URL
+      const response = await fetch(url, {
         method: 'POST',
         body: formData
       });
