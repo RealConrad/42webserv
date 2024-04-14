@@ -1,5 +1,10 @@
 #include "HTTPResponse.hpp"
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <dirent.h>
+
 HTTPResponse::HTTPResponse() {}
 
 HTTPResponse::~HTTPResponse() {}
@@ -56,19 +61,57 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 	}
 }
 
+// void HTTPResponse::serveFile(const ServerConfig& serverConfig, const std::string& uri) {
+// 	std::string filePath = serverConfig.rootDirectory + (uri == "/" ? "/index.html" : uri);
+// 	std::ifstream file(filePath.c_str());
+// 	INFO("Serving file: " << filePath);
+// 	if (file) {
+// 		std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+// 		assignResponse(200, content, determineContentType(uri));
+// 		file.close();
+// 	} else {
+// 		WARNING("File '" << filePath << "' not found. Serving 404 page");
+// 		assignPageNotFoundContent(serverConfig);
+// 	}
+// }
+
 void HTTPResponse::serveFile(const ServerConfig& serverConfig, const std::string& uri) {
-	std::string filePath = serverConfig.rootDirectory + (uri == "/" ? "/index.html" : uri);
-	std::ifstream file(filePath.c_str());
-	INFO("Serving file: " << filePath);
-	if (file) {
-		std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-		assignResponse(200, content, determineContentType(uri));
-		file.close();
+	std::string fullPath = serverConfig.rootDirectory + (uri == "/" ? "" : uri);
+	struct stat path_stat;
+	stat(fullPath.c_str(), &path_stat);
+
+	if (S_ISDIR(path_stat.st_mode)) {
+		DIR* dir = opendir(fullPath.c_str());
+		if (dir != nullptr) {
+			struct dirent* entry;
+			std::string content = "<html><body><h1>Directory Listing</h1><ul>";
+			while ((entry = readdir(dir)) != nullptr) {
+				content += "<li><a href='" + std::string(entry->d_name) + "'>" + std::string(entry->d_name) + "</a></li>";
+			}
+			content += "</ul></body></html>";
+			closedir(dir);
+			assignResponse(200, content, "text/html");
+		} else {
+			WARNING("Failed to open directory: '" + fullPath + "'. Serving 404 page");
+			assignPageNotFoundContent(serverConfig);
+		}
+	} else if (S_ISREG(path_stat.st_mode)) {
+		std::ifstream file(fullPath.c_str());
+		INFO("Serving file: " << fullPath);
+		if (file) {
+			std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+			assignResponse(200, content, determineContentType(uri));
+			file.close();
+		} else {
+			WARNING("File '" << fullPath << "' not found. Serving 404 page");
+			assignPageNotFoundContent(serverConfig);
+		}
 	} else {
-		WARNING("File '" << filePath << "' not found. Serving 404 page");
+		WARNING("Path '" + fullPath + "' not found. Serving 404 page");
 		assignPageNotFoundContent(serverConfig);
 	}
 }
+
 
 void HTTPResponse::assignPageNotFoundContent(const ServerConfig& serverConfig) {
 	std::string notFoundPagePath = serverConfig.rootDirectory + "/pages/NotFound.html";
