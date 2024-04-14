@@ -60,10 +60,8 @@ void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerCon
 
     if (requestURI == "/upload-file") {
         INFO("File upload endpoint called for server: " << serverConfig.serverName);
-        std::string fileContent = request.getBody();
+        std::string fileContent = request.getFileContent();
         std::string fileName = request.getFileName();
-		DEBUG("File content: " << fileContent);
-		DEBUG("File name: " << fileName);
         if (fileContent.empty() || fileName.empty()) {
             ERROR("No file content or filename provided");
             assignResponse(400, "Bad Request: No file content or filename provided", "text/html");
@@ -80,7 +78,7 @@ void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerCon
                 INFO("File uploaded successfully: " + savePath);
                 assignResponse(200, "File uploaded successfully", "text/html");
             } else {
-                ERROR("Failed to write file to disk");
+                ERROR("Failed to store file");
                 assignResponse(500, "Internal Server Error. Failed to write file.", "text/html");
             }
         } else {

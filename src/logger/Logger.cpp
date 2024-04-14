@@ -16,6 +16,28 @@ Logger::Logger() {}
 
 Logger::~Logger() {}
 
+std::string Logger::makeVisible(const std::string& input) {
+    std::ostringstream result;
+    for (size_t i = 0; i < input.length(); ++i) {
+        char c = input[i];
+        switch (c) {
+            case '\n':
+                result << "\\n\n";
+                break;
+            case '\t':
+                result << "\\t\t";
+                break;
+            case '\r':
+                result << "\\r";
+                break;
+            default:
+                result << c;
+                break;
+        }
+    }
+    return result.str();
+}
+
 void Logger::initialize(bool enableLogging, bool enableLogFile) {
 	debugEnabled = enableLogging;
 	successEnabled = enableLogging;
