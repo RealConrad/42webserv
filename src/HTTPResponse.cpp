@@ -75,24 +75,85 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 // 	}
 // }
 
+// void HTTPResponse::serveFile(const ServerConfig& serverConfig, const std::string& uri) {
+// 	std::string fullPath = serverConfig.rootDirectory + (uri == "/" ? "" : uri);
+// 	struct stat path_stat;
+// 	stat(fullPath.c_str(), &path_stat);
+
+// 	if (S_ISDIR(path_stat.st_mode)) {
+// 		DIR* dir = opendir(fullPath.c_str());
+// 		if (dir != nullptr) {
+// 			struct dirent* entry;
+// 			std::string content = "<html><body><h1>Directory Listing of " + uri + "</h1><ul>";
+// 			while ((entry = readdir(dir)) != nullptr) {
+// 				// Ensure the path starts from the root
+// 				std::string name = entry->d_name;
+// 				std::string link = uri + (uri.back() == '/' ? "" : "/") + name;
+
+// 				// Correcting the path to ensure it starts from the root
+// 				if (link[0] != '/') {
+// 					link = "/" + link;
+// 				}
+// 				content += "<li><a href='" + link + "'>" + name + "</a></li>";
+// 			}
+// 			content += "</ul></body></html>";
+// 			closedir(dir);
+// 			assignResponse(200, content, "text/html");
+// 		} else {
+// 			WARNING("Failed to open directory: '" + fullPath + "'. Serving 404 page");
+// 			assignPageNotFoundContent(serverConfig);
+// 		}
+// 	} else if (S_ISREG(path_stat.st_mode)) {
+// 		std::ifstream file(fullPath.c_str());
+// 		INFO("Serving file: " << fullPath);
+// 		if (file) {
+// 			std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+// 			assignResponse(200, content, determineContentType(uri));
+// 			file.close();
+// 		} else {
+// 			WARNING("File '" << fullPath << "' not found. Serving 404 page");
+// 			assignPageNotFoundContent(serverConfig);
+// 		}
+// 	} else {
+// 		WARNING("Path '" + fullPath + "' not found. Serving 404 page");
+// 		assignPageNotFoundContent(serverConfig);
+// 	}
+// }
+
 void HTTPResponse::serveFile(const ServerConfig& serverConfig, const std::string& uri) {
-	std::string fullPath = serverConfig.rootDirectory + (uri == "/" ? "" : uri);
+	std::string fullPath = serverConfig.rootDirectory + (uri == "/" ? "/" : uri);
 	struct stat path_stat;
 	stat(fullPath.c_str(), &path_stat);
 
+	// Serve index.html if exists in the directory
 	if (S_ISDIR(path_stat.st_mode)) {
-		DIR* dir = opendir(fullPath.c_str());
-		if (dir != nullptr) {
-			struct dirent* entry;
-			std::string content = "<html><body><h1>Directory Listing</h1><ul>";
-			while ((entry = readdir(dir)) != nullptr) {
-				content += "<li><a href='" + std::string(entry->d_name) + "'>" + std::string(entry->d_name) + "</a></li>";
-			}
-			content += "</ul></body></html>";
-			closedir(dir);
+		std::string indexPath = fullPath + "/index.html";
+		std::ifstream indexFile(indexPath.c_str());
+		if (indexFile) {
+			std::string content((std::istreambuf_iterator<char>(indexFile)), std::istreambuf_iterator<char>());
 			assignResponse(200, content, "text/html");
+			indexFile.close();
+			return;
+		} else if (serverConfig.directoryListing) {
+			DIR* dir = opendir(fullPath.c_str());
+			if (dir != nullptr) {
+				struct dirent* entry;
+				std::string content = "<html><body><h1>Directory Listing of " + uri + "</h1><ul>";
+				while ((entry = readdir(dir)) != nullptr) {
+					if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+						continue;
+					std::string name = entry->d_name;
+					std::string link = uri + (uri.back() == '/' ? "" : "/") + name;
+					content += "<li><a href='" + link + "'>" + name + "</a></li>";
+				}
+				content += "</ul></body></html>";
+				closedir(dir);
+				assignResponse(200, content, "text/html");
+			} else {
+				WARNING("Failed to open directory: '" + fullPath + "'. Serving 404 page");
+				assignPageNotFoundContent(serverConfig);
+			}
 		} else {
-			WARNING("Failed to open directory: '" + fullPath + "'. Serving 404 page");
 			assignPageNotFoundContent(serverConfig);
 		}
 	} else if (S_ISREG(path_stat.st_mode)) {
@@ -103,7 +164,7 @@ void HTTPResponse::serveFile(const ServerConfig& serverConfig, const std::string
 			assignResponse(200, content, determineContentType(uri));
 			file.close();
 		} else {
-			WARNING("File '" << fullPath << "' not found. Serving 404 page");
+			WARNING("File '" + fullPath + "' not found. Serving 404 page");
 			assignPageNotFoundContent(serverConfig);
 		}
 	} else {
