@@ -93,21 +93,21 @@ void HTTPResponse::serveFile(const ServerConfig& serverConfig, const std::string
 			assignResponse(200, content, "text/html");
 			indexFile.close();
 			return;
-		} else if (indexFile.fail())
-			WARNING("Failed to open index.html!");
-
-		/* checking for default folder files */
-		std::string folderNameHtml = fullPath + (fullPath[fullPath.size() - 1] == '/' ? "" : "/") + extractFolderName(uri) + ".html";
-		std::ifstream folderHtmlFile(folderNameHtml.c_str());
-		if (!folderHtmlFile.fail()) {
-			INFO("Serving Default File for Folder: " << folderNameHtml);
-			std::string content((std::istreambuf_iterator<char>(folderHtmlFile)), std::istreambuf_iterator<char>());
-			assignResponse(200, content, "text/html");
-			folderHtmlFile.close();
-			return;
-		} else
-			WARNING("Failed to open " << folderNameHtml);
-
+		} else if (uri == "/"){
+			WARNING("Missing or Failed to open index.html!");
+		} else {
+			/* checking for default folder files */
+			std::string folderNameHtml = fullPath + (fullPath[fullPath.size() - 1] == '/' ? "" : "/") + extractFolderName(uri) + ".html";
+			std::ifstream folderHtmlFile(folderNameHtml.c_str());
+			if (!folderHtmlFile.fail()) {
+				INFO("Serving Default File for Folder: " << folderNameHtml);
+				std::string content((std::istreambuf_iterator<char>(folderHtmlFile)), std::istreambuf_iterator<char>());
+				assignResponse(200, content, "text/html");
+				folderHtmlFile.close();
+				return;
+			} else
+				INFO("Missing directory default file " << folderNameHtml);
+		}
 		/* if no default folder file found - directory listing */
 		if (serverConfig.directoryListing) {
 			DIR* dir = opendir(fullPath.c_str());
