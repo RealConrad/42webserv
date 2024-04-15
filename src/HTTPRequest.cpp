@@ -10,12 +10,6 @@ HTTPRequest::~HTTPRequest() {}
 
 void HTTPRequest::parseRequest(const std::string& request) {
 	std::istringstream requestStream(request);
-	std::string line;
-	std::getline(requestStream, line);
-	std::istringstream lineStream(line);
-	lineStream >> this->method;
-	lineStream >> this->uri;
-	lineStream >> this->version;
 	parseHeaders(requestStream);
 	parseBody(requestStream);
 	SUCCESS("Recived HTTP Request: " << method << " on " << uri);
@@ -23,6 +17,11 @@ void HTTPRequest::parseRequest(const std::string& request) {
 
 void HTTPRequest::parseHeaders(std::istringstream& stream) {
 	std::string line;
+	std::getline(stream, line);
+	std::istringstream lineStream(line);
+	lineStream >> this->method;
+	lineStream >> this->uri;
+	lineStream >> this->version;
 	while (std::getline(stream, line) && line != "\r") {
 		size_t colonPos = line.find(":");
 		if (colonPos != std::string::npos) {

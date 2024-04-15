@@ -4,7 +4,7 @@
 #include <stdexcept>
 
 int main(int argc, char** argv) {
-	Logger::initialize(true);
+	Logger::initialize(true, true);
 	INFO("*** Starting Webserv ***");
 	if (argc > 2) {
 		ERROR("Invalid number of parameters");
