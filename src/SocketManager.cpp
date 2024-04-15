@@ -15,7 +15,7 @@ SocketManager::~SocketManager() {
 /*                                 Main Server                                */
 /* -------------------------------------------------------------------------- */
 
-void stopServer(int){
+void stopServer(int) {
 	g_run = false;
 }
 
@@ -59,8 +59,9 @@ void SocketManager::run() {
 					acceptNewConnections(this->fds[i].fd);
 				} else {
 					fds[i].events |= POLLOUT;
-					if (readClientData(fds[i].fd))
+					if (readClientData(fds[i].fd)) {
 						processRequest(fds[i].fd);
+					}
 				}
 			}
 			if (this->fds[i].revents & POLLOUT && !isServerSocket(this->fds[i].fd)) {
@@ -151,11 +152,8 @@ void SocketManager::acceptNewConnections(int server_fd) {
 		ERROR("Error accepting connection");
 		return;
 	}
-
 	this->clientStates[newsockfd] = ClientState();
-
 	fcntl(newsockfd, F_SETFL, O_NONBLOCK | FD_CLOEXEC);
-
 	struct pollfd new_pfd = {newsockfd, POLLIN, 0};
 	this->fds.push_back(new_pfd);
 	time(&clientStates[newsockfd].lastActivity);
@@ -165,10 +163,12 @@ void SocketManager::acceptNewConnections(int server_fd) {
 /* ----------------------------- Handle Requests ---------------------------- */
 
 bool SocketManager::readClientData(int fd) {
-	char buffer[4096 * 10];
-	ssize_t bytesRead = recv(fd, buffer, sizeof(buffer), 0);
+	size_t size = 4096 * 4;
+	char buffer[size + 1];
+	INFO("\nREADING BUFFER SIZE!\n");
+	ssize_t bytesRead = recv(fd, buffer, size, 0);
 	if (bytesRead > 0) {
-		this->clientStates[fd].readBuffer.append(buffer, bytesRead);
+		this->clientStates[fd].readBuffer.append(buffer, static_cast<size_t>(bytesRead));
 		if (this->clientStates[fd].readBuffer.find("\r\n\r\n") != std::string::npos) {
 			return true;
 		}
@@ -183,14 +183,14 @@ bool SocketManager::readClientData(int fd) {
 
 void SocketManager::processRequest(int fd) {
 	HTTPRequest request(this->clientStates[fd].readBuffer);
-	BLOCK(this->clientStates[fd].readBuffer);
+	INFO("Buffer printed......")
+	// BLOCK(this->clientStates[fd].readBuffer);
 	std::string keepAlive = request.getHeader("Connection");
 	if (keepAlive == "keep-alive")
 		clientStates[fd].keepAlive = true;
 	else
 		clientStates[fd].keepAlive = false;
 	const ServerConfig& serverConfig = getCurrentServer(request);
-
 	try {
 		HTTPResponse response;
 		response.prepareResponse(request, serverConfig);
