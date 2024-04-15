@@ -60,7 +60,7 @@ void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerCon
 
     if (requestURI == "/upload-file") {
         INFO("File upload endpoint called for server: " << serverConfig.serverName);
-        std::string fileContent = request.getFileContent();
+        std::string fileContent = request.getBody();
         std::string fileName = request.getFileName();
         if (fileContent.empty() || fileName.empty()) {
             ERROR("No file content or filename provided");
