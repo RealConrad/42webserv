@@ -28,6 +28,7 @@ class HTTPResponse {
         void serveFile(const ServerConfig& serverConfig, const std::string& uri);
         void handleRequestGET(const HTTPRequest& request, const ServerConfig& serverConfig);
         void assignPageNotFoundContent(const ServerConfig& serverConfig);
+		std::string extractFolderName(const std::string& uri);
         
         /* -------------------------------------------------------------------------- */
         /*                                   Setters                                  */
