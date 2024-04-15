@@ -62,21 +62,20 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 }
 
 std::string HTTPResponse::extractFolderName(const std::string& uri) {
-	if (uri.empty()) return "";
+	if (uri.empty())
+		return ("");
 	size_t lastSlashPos;
-	if (uri.back() == '/') {
+	if (uri[uri.size() - 1] == '/')
 		lastSlashPos = uri.find_last_of('/', uri.length() - 2);
-	} else {
+	else
 		lastSlashPos = uri.find_last_of('/');
-	}
-	if (lastSlashPos == std::string::npos || lastSlashPos == uri.length() - 1) {
-		return "";
-	}
+	if (lastSlashPos == std::string::npos || lastSlashPos == uri.length() - 1)
+		return ("");
 	size_t start = lastSlashPos + 1;
 	size_t end = uri.find('/', start);
 	if (end == std::string::npos)
 		end = uri.length();
-	return uri.substr(start, end - start);
+	return (uri.substr(start, end - start));
 }
 
 void HTTPResponse::serveFile(const ServerConfig& serverConfig, const std::string& uri) {
@@ -84,67 +83,69 @@ void HTTPResponse::serveFile(const ServerConfig& serverConfig, const std::string
 	struct stat path_stat;
 	stat(fullPath.c_str(), &path_stat);
 
-	if (S_ISDIR(path_stat.st_mode)) {
+	if (S_ISDIR(path_stat.st_mode)) { // is directory
 		/* checking for root and index */
-		std::string indexPath = serverConfig.rootDirectory + (serverConfig.rootDirectory.back() == '/' ? "" : "/") + "index.html";
+		std::string indexPath = serverConfig.rootDirectory + (serverConfig.rootDirectory[serverConfig.rootDirectory.size() - 1] == '/' ? "" : "/") + "index.html";
 		std::ifstream indexFile(indexPath.c_str());
-		if (uri == "/" && indexFile) {
+		if (uri == "/" && !indexFile.fail()) {
 			INFO("Serving index: " << indexPath);
 			std::string content((std::istreambuf_iterator<char>(indexFile)), std::istreambuf_iterator<char>());
 			assignResponse(200, content, "text/html");
 			indexFile.close();
 			return;
-		}
+		} else if (indexFile.fail())
+			WARNING("Failed to open index.html!");
 
 		/* checking for default folder files */
-		std::string folderNameHtml = fullPath + (fullPath.back() == '/' ? "" : "/") + extractFolderName(uri) + ".html";
+		std::string folderNameHtml = fullPath + (fullPath[fullPath.size() - 1] == '/' ? "" : "/") + extractFolderName(uri) + ".html";
 		std::ifstream folderHtmlFile(folderNameHtml.c_str());
-		if (folderHtmlFile) {
+		if (!folderHtmlFile.fail()) {
 			INFO("Serving Default File for Folder: " << folderNameHtml);
 			std::string content((std::istreambuf_iterator<char>(folderHtmlFile)), std::istreambuf_iterator<char>());
 			assignResponse(200, content, "text/html");
 			folderHtmlFile.close();
 			return;
-		}
+		} else
+			WARNING("Failed to open " << folderNameHtml);
 
 		/* if no default folder file found - directory listing */
 		if (serverConfig.directoryListing) {
 			DIR* dir = opendir(fullPath.c_str());
-			if (dir != nullptr) {
+			if (dir != NULL) {
 				INFO("Serving Directory Listing of: " << fullPath);
 				struct dirent* entry;
 				std::string content = "<html><body><h1>Directory Listing of " + uri + "</h1><ul>";
-				while ((entry = readdir(dir)) != nullptr) {
-					if (strcmp(entry->d_name, ".") == 0)
+				while ((entry = readdir(dir)) != NULL) {
+					if (entry->d_name[0] == '.')
 						continue;
 					std::string name = entry->d_name;
-					std::string link = uri + (uri.back() == '/' ? "" : "/") + name;
+					std::string link = uri + (uri[uri.size() - 1] == '/' ? "" : "/") + name;
 					content += "<li><a href='" + link + "'>" + name + "</a></li>";
 				}
 				content += "</ul></body></html>";
 				closedir(dir);
 				assignResponse(200, content, "text/html");
 			} else {
-				WARNING("Failed to open directory: '" + fullPath + "'. Serving 404 page");
+				WARNING("Failed to open directory: '" << fullPath << "'. Serving 404 page");
 				assignPageNotFoundContent(serverConfig);
 			}
 		} else {
-			WARNING("Failed to open directory: '" + fullPath + "'. Serving 404 page");
+			WARNING("Directory Listing Disabled!. Serving 404 page");
 			assignPageNotFoundContent(serverConfig);
 		}
-	} else if (S_ISREG(path_stat.st_mode)) {
+	} else if (S_ISREG(path_stat.st_mode)) { // is regular file
 		std::ifstream file(fullPath.c_str());
-		INFO("Serving file: " << fullPath);
-		if (file) {
+		if (!file.fail()) {
+			INFO("Serving file: " << fullPath);
 			std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 			assignResponse(200, content, determineContentType(uri));
 			file.close();
 		} else {
-			WARNING("File '" + fullPath + "' not found. Serving 404 page");
+			WARNING("File '" << fullPath << "' not found. Serving 404 page");
 			assignPageNotFoundContent(serverConfig);
 		}
 	} else {
-		WARNING("Path '" + fullPath + "' not found. Serving 404 page");
+		WARNING("Path '" << fullPath << "' could not be recognised! Serving 404 page");
 		assignPageNotFoundContent(serverConfig);
 	}
 }

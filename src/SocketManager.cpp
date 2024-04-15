@@ -1,4 +1,5 @@
 #include "SocketManager.hpp"
+#include "signal.h"
 
 bool g_run; 
 
