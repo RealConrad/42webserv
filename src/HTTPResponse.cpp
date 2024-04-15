@@ -96,7 +96,7 @@ void HTTPResponse::serveFile(const ServerConfig& serverConfig, const std::string
 	std::string filePath = serverConfig.rootDirectory + (uri == "/" ? "/index.html" : uri);
 	std::ifstream file(filePath.c_str());
 	INFO("Serving file: " << filePath);
-	if (file) {
+	if (file.fail()) {
 		std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 		assignResponse(200, content, determineContentType(uri));
 		file.close();

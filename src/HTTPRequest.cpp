@@ -16,12 +16,8 @@ void HTTPRequest::parseRequest(const std::string& request) {
 	lineStream >> this->method;
 	lineStream >> this->uri;
 	lineStream >> this->version;
-	DEBUG("BEFORE:");
-	BLOCK(request);
 	parseHeaders(requestStream);
 	parseBody(requestStream);
-	DEBUG("AFTER:");
-	BLOCK(getBody());
 	SUCCESS("Recived HTTP Request: " << method << " on " << uri);
 }
 
@@ -41,7 +37,6 @@ void HTTPRequest::parseBody(std::istringstream& stream) {
 	std::string contentType = this->headers["Content-Type"];
 	if (contentType.find("multipart/form-data") != std::string::npos) {
 		std::string boundary = extractBoundary(contentType);
-		DEBUG("BOUNDARY: " << boundary);
 		if (!boundary.empty()) {
 			parseMultipartFile(stream, boundary);
 		} else {
@@ -119,11 +114,7 @@ void HTTPRequest::parseMultipartFile(std::istream& stream, const std::string& bo
     this->fileName = filename;
     this->fileContentType = contentType;
     this->body.assign(fileContent.begin(), fileContent.end());
-    SUCCESS("FINISHED PARSING FILE CONTENT: " + filename);
 }
-
-
-
 
 std::string HTTPRequest::extractBoundary(const std::string& contentType) const {
 	size_t boundaryPos = contentType.find("boundary=");

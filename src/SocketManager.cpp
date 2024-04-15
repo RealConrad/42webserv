@@ -165,20 +165,18 @@ void SocketManager::acceptNewConnections(int server_fd) {
 /* ----------------------------- Handle Requests ---------------------------- */
 
 bool SocketManager::readClientData(int fd) {
-	// INFO("\nREADING BUFFER SIZE!\n");
 	size_t size = 4096 * 4;
 	char buffer[size];
 	ssize_t bytesRead = recv(fd, buffer, size, 0);
 
 	if (bytesRead > 0) {
-		this->clientStates[fd].readBuffer.append(buffer, bytesRead);  // Append to the client state buffer
+		this->clientStates[fd].readBuffer.append(buffer, bytesRead);
 
-		// Check if headers are complete
 		if (!this->clientStates[fd].headersComplete) {
 			size_t headerEndPos = this->clientStates[fd].readBuffer.find("\r\n\r\n");
 			if (headerEndPos != std::string::npos) {
 				this->clientStates[fd].headersComplete = true;
-				this->clientStates[fd].headerEndIndex = headerEndPos + 4;  // Position after headers
+				this->clientStates[fd].headerEndIndex = headerEndPos + 4;
 				
 				// Find and extract Content-Length
 				size_t startPos = this->clientStates[fd].readBuffer.find("Content-Length: ");
@@ -190,24 +188,17 @@ bool SocketManager::readClientData(int fd) {
 
 					// Calculate already read body length
 					this->clientStates[fd].totalRead = this->clientStates[fd].readBuffer.length() - this->clientStates[fd].headerEndIndex;
-					// DEBUG("TOTAL READ FOR HEADER: " << this->clientStates[fd].totalRead);
-					// DEBUG("FINISHED READING HEADER");
-					// DEBUG("CONTENT LENGTH: " << this->clientStates[fd].contentLength);
 				}
 			}
 		} else {
 			this->clientStates[fd].totalRead += bytesRead;
-			// DEBUG("INCREMENTING TOTAL READ: " << this->clientStates[fd].totalRead);
 		}
-
 		if (this->clientStates[fd].headersComplete && this->clientStates[fd].totalRead >= this->clientStates[fd].contentLength) {
-			// SUCCESS("READ EVERYTHING FROM SOCKET!");
 			return true;
 		}
 	} else if (bytesRead == 0) {
 		clientStates[fd].closeConnection = true;
 	} else if (bytesRead < 0) {
-		// An error occurred during reading
 		ERROR("Failed to read from recv()");
 		clientStates[fd].closeConnection = true;
 	}
