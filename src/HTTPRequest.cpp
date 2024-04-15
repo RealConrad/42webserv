@@ -102,14 +102,10 @@ void HTTPRequest::parseMultipartFile(std::istringstream& stream, const std::stri
 		}
 	}
 
-	this->fileContent = fileStream.str();
-	if (!fileContent.empty()) {
-		this->fileContent.pop_back(); // remove trailing new line
+	this->body = fileStream.str();
+	if (!body.empty()) {
+		this->body.pop_back(); // remove trailing new line
 	}
-
-	// DEBUG("File Content: " << fileContent);
-	// DEBUG("File Name: " << fileName);
-	// DEBUG("File Content Type: " << fileContentType);
 }
 
 
@@ -127,7 +123,6 @@ std::string HTTPRequest::extractBoundary(const std::string& contentType) const {
 
 	// Ensure boundary is properly prefixed
 	boundary = "--" + boundary;
-	INFO("BOUNDARY: " << boundary);
 	return boundary;
 }
 
@@ -153,10 +148,6 @@ std::string HTTPRequest::getBody() const {
 
 std::string HTTPRequest::getFileName() const {
 	return this->fileName;
-}
-
-std::string HTTPRequest::getFileContent() const {
-	return this->fileContent;
 }
 
 std::string HTTPRequest::getFileContentType() const {
