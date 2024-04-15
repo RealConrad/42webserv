@@ -69,9 +69,10 @@ void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerCon
         }
 
         std::string savePath = serverConfig.rootDirectory + "/uploads/" + fileName;
-        std::ofstream outFile(savePath.c_str(), std::ios::out | std::ios::binary);
+        std::ofstream outFile(savePath.c_str());
         if (outFile) {
-            outFile.write(fileContent.c_str(), fileContent.size());
+			// BLOCK(request.getBody());
+            outFile.write(request.getBody().c_str(), request.getBody().size());
             outFile.close();
 
             if (!outFile.fail()) {

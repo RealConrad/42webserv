@@ -22,7 +22,7 @@ class HTTPRequest {
         void parseHeaders(std::istringstream& stream);
         void parseBody(std::istringstream& stream);
         std::string extractHeaderValue(const std::string& header, const std::string& key);
-		void parseMultipartFile(std::istringstream& stream, const std::string& boundary);
+		void parseMultipartFile(std::istream& stream, const std::string& boundary);
         std::string extractBoundary(const std::string& contentType) const;
     public:
         HTTPRequest();

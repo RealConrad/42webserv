@@ -60,6 +60,8 @@ void SocketManager::run() {
 				} else {
 					fds[i].events |= POLLOUT;
 					if (readClientData(fds[i].fd)) {
+						DEBUG("TOTAL READ: " << this->clientStates[this->fds[i].fd].totalRead);
+						DEBUG("CONTENT LENGTH: " << this->clientStates[this->fds[i].fd].contentLength);
 						processRequest(fds[i].fd);
 					}
 				}
@@ -163,7 +165,7 @@ void SocketManager::acceptNewConnections(int server_fd) {
 /* ----------------------------- Handle Requests ---------------------------- */
 
 bool SocketManager::readClientData(int fd) {
-	INFO("\nREADING BUFFER SIZE!\n");
+	// INFO("\nREADING BUFFER SIZE!\n");
 	size_t size = 4096 * 4;
 	char buffer[size];
 	ssize_t bytesRead = recv(fd, buffer, size, 0);
@@ -188,29 +190,27 @@ bool SocketManager::readClientData(int fd) {
 
 					// Calculate already read body length
 					this->clientStates[fd].totalRead = this->clientStates[fd].readBuffer.length() - this->clientStates[fd].headerEndIndex;
-					DEBUG("TOTAL READ FOR HEADER: " << this->clientStates[fd].totalRead);
-					DEBUG("FINISHED READING HEADER");
-					DEBUG("CONTENT LENGTH: " << this->clientStates[fd].contentLength);
+					// DEBUG("TOTAL READ FOR HEADER: " << this->clientStates[fd].totalRead);
+					// DEBUG("FINISHED READING HEADER");
+					// DEBUG("CONTENT LENGTH: " << this->clientStates[fd].contentLength);
 				}
 			}
 		} else {
 			this->clientStates[fd].totalRead += bytesRead;
-			DEBUG("INCREMENTING TOTAL READ: " << this->clientStates[fd].totalRead);
+			// DEBUG("INCREMENTING TOTAL READ: " << this->clientStates[fd].totalRead);
 		}
 
 		if (this->clientStates[fd].headersComplete && this->clientStates[fd].totalRead >= this->clientStates[fd].contentLength) {
-			SUCCESS("READ EVERYTHING FROM SOCKET!");
+			// SUCCESS("READ EVERYTHING FROM SOCKET!");
 			return true;
 		}
 	} else if (bytesRead == 0) {
 		clientStates[fd].closeConnection = true;
-		return false;
 	} else if (bytesRead < 0) {
 		// An error occurred during reading
 		ERROR("Failed to read from recv()");
 		clientStates[fd].closeConnection = true;
 	}
-
 	return false;
 }
 
@@ -219,7 +219,6 @@ bool SocketManager::readClientData(int fd) {
 
 void SocketManager::processRequest(int fd) {
 	HTTPRequest request(this->clientStates[fd].readBuffer);
-	INFO("Buffer printed......")
 	// BLOCK(this->clientStates[fd].readBuffer);
 	std::string keepAlive = request.getHeader("Connection");
 	if (keepAlive == "keep-alive")
