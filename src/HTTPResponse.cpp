@@ -37,18 +37,17 @@ void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& Ser
 
 void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConfig& serverConfig) {
 	std::string requestURI = request.getURI();
-	static int lol = 0;
+	static int image = 0;
 	
 	if (requestURI == "/get-images") {
-		lol++;
+		image++;
 		INFO("/get-images endpoint called for server: " << serverConfig.serverName);
-		// TODO: CHANGE THIS TO READ FROM A DIRECTORY MAYBE?
 		std::vector<std::string> images;
 		images.push_back("/images/image1.jpg");
 		images.push_back("/images/image2.jpg");
 		images.push_back("/images/image3.jpg");
 		// Get random image
-		std::string imagePath = serverConfig.rootDirectory + images[lol % images.size()];
+		std::string imagePath = serverConfig.rootDirectory + images[image % images.size()];
 		std::ifstream file(imagePath.c_str());
 		INFO("Serving image: " << imagePath);
 		if (file) {
