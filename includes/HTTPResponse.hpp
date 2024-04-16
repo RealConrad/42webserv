@@ -33,7 +33,7 @@ class HTTPResponse {
         bool serveDefaultFile(const std::string& uri, const std::string& fullPath);
         void serveDirectoryListing(const ServerConfig& serverConfig, const std::string& uri, const std::string& fullPath);
         void serveRegularFile(const ServerConfig& serverConfig, const std::string& uri, const std::string& fullPath);
-
+		bool cheekySlashes(const std::string& uri);
         
         /* -------------------------------------------------------------------------- */
         /*                                   Setters                                  */

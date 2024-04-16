@@ -141,21 +141,30 @@ void HTTPResponse::serveRegularFile(const ServerConfig& serverConfig, const std:
 	}
 }
 
+bool HTTPResponse::cheekySlashes(const std::string& uri){
+	if (uri.size() == 0)
+		return (true);
+	for (size_t i = 0; i < uri.size(); i++)
+	{
+		if (uri[i] != '/')
+			return (false);
+	}
+	return (true);
+}
+
 void HTTPResponse::serveFile(const ServerConfig& serverConfig, const std::string& uri) {
 	std::string fullPath = serverConfig.rootDirectory + uri;
 	struct stat path_stat;
 	stat(fullPath.c_str(), &path_stat);
 	if (S_ISDIR(path_stat.st_mode)) {
-		if (uri == "/" && serveIndex(serverConfig))
+		if (cheekySlashes(uri) && serveIndex(serverConfig))
 			return;
 		if (serveDefaultFile(uri, fullPath))
 			return;
-		if (serverConfig.directoryListing) {
+		if (serverConfig.directoryListing)
 			serveDirectoryListing(serverConfig, uri, fullPath);
-		} else {
-			if (!serveIndex(serverConfig))
-				assignPageNotFoundContent(serverConfig);
-		}
+		else
+			assignPageNotFoundContent(serverConfig);
 	} else if (S_ISREG(path_stat.st_mode)) {
 			serveRegularFile(serverConfig, uri, fullPath);
 	} else {
