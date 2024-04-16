@@ -26,7 +26,7 @@ void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& Ser
 			handleRequestPOST(request, ServerConfig);
 			break;
 		case DELETE:
-			ERROR("DELETE REQUEST NOT IMPLEMENTED YET!");
+			handleRequestDELETE(request, ServerConfig);
 			break;
 		default:
 			// TODO: SEND ERROR BACK TO CLIENT
@@ -57,6 +57,21 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 			WARNING("Image: '" << imagePath << "' not found. Serving 404 page");
 			assignPageNotFoundContent(serverConfig);
 		}
+	} else if (requestURI == "/get-files") {
+		INFO("/get-files endpoint called for server: " << serverConfig.serverName);
+		// TODO: READ FROM DIRECTORY AND SERVE FILES
+		std::vector<std::string> fileNames;
+		fileNames.push_back("/delete/image1.jpg");
+		fileNames.push_back("/delete/image2.jpg");
+		fileNames.push_back("/delete/image3.jpg");
+		std::string json = "[";
+		for(size_t i = 0; i < fileNames.size(); ++i) {
+			json += "\"" + fileNames[i] + "\"";
+			if (i < fileNames.size() - 1)
+				json += ", ";
+		}
+    	json += "]";
+		assignResponse(200, json, "application/json");
 	} else {
 		serveFile(serverConfig, requestURI);
 	}
@@ -95,6 +110,25 @@ void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerCon
 	} else {
 		WARNING("Unsupported POST request for URI: " + requestURI);
 		assignResponse(404, "The requested URL was not found on this server", "text/html");
+	}
+}
+
+void HTTPResponse::handleRequestDELETE(const HTTPRequest& request, const ServerConfig& serverConfig) {
+	std::string requestURI = request.getURI();
+
+	if (requestURI == "/delete-file") {
+		INFO("File delete endpoint called for server: " << serverConfig.serverName);
+		std::string fileName = request.getBody();
+		if (access((serverConfig.rootDirectory + fileName).c_str(), F_OK) != 0) {
+			ERROR("File does not exist: " + fileName);
+			assignResponse(404, "File does not exist", "application/json");
+			return;
+		}
+
+		// TODO: NOT SURE HOW TO REMOVE FILE???
+	} else {
+		WARNING("Unsupported DELETE request for URI: " + requestURI);
+		assignPageNotFoundContent(serverConfig);
 	}
 }
 
