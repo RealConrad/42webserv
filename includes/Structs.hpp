@@ -34,6 +34,12 @@ struct ServerConfig {
 	std::vector<LocationConfig> locations;
 };
 
+struct HTTPConfig {
+	std::vector<ServerConfig> serverConfigs;
+	int server_timeout_time;
+	int keepAliveTimeout;
+};
+
 struct ClientState {
 	std::string readBuffer;
 	std::string writeBuffer;
@@ -47,13 +53,6 @@ struct ClientState {
 	int serverPort;
 	ServerConfig serverConfig;
 	ClientState() : totalRead(0), contentLength(0), headerEndIndex(0), headersComplete(false), closeConnection(false)  {};
-};
-
-
-struct HTTPConfig {
-	std::vector<ServerConfig> serverConfigs;
-	int server_timeout_time;
-	int keepAliveTimeout;
 };
 
 #endif

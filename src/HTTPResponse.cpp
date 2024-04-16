@@ -46,7 +46,6 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 		images.push_back("/images/image1.jpg");
 		images.push_back("/images/image2.jpg");
 		images.push_back("/images/image3.jpg");
-		// Get random image
 		std::string imagePath = serverConfig.rootDirectory + images[image % images.size()];
 		std::ifstream file(imagePath.c_str());
 		INFO("Serving image: " << imagePath);
