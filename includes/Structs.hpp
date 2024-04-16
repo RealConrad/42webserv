@@ -22,9 +22,9 @@ enum SectionTypes {
 struct ClientState {
 	std::string readBuffer;
 	std::string writeBuffer;
-	ssize_t totalRead;
-	ssize_t contentLength;
-	ssize_t headerEndIndex;
+	size_t totalRead;
+	size_t contentLength;
+	size_t headerEndIndex;
 	bool headersComplete;
 	bool keepAlive;
 	time_t lastActivity;
