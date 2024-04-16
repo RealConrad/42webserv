@@ -60,8 +60,6 @@ void SocketManager::run() {
 				} else {
 					fds[i].events |= POLLOUT;
 					if (readClientData(fds[i].fd)) {
-						DEBUG("TOTAL READ: " << this->clientStates[this->fds[i].fd].totalRead);
-						DEBUG("CONTENT LENGTH: " << this->clientStates[this->fds[i].fd].contentLength);
 						processRequest(fds[i].fd);
 					}
 				}
@@ -177,7 +175,7 @@ bool SocketManager::readClientData(int fd) {
 			if (headerEndPos != std::string::npos) {
 				this->clientStates[fd].headersComplete = true;
 				this->clientStates[fd].headerEndIndex = headerEndPos + 4;
-				
+
 				// Find and extract Content-Length
 				size_t startPos = this->clientStates[fd].readBuffer.find("Content-Length: ");
 				if (startPos != std::string::npos) {
