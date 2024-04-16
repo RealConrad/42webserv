@@ -316,10 +316,6 @@ void SocketManager::closeConnection(int fd) {
 	}
 }
 
-void SocketManager::addServerFd(int fd) {
-	server_fds.push_back(fd);
-}
-
 bool SocketManager::isServerSocket(int fd) {
 	return std::find(server_fds.begin(), server_fds.end(), fd) != server_fds.end();
 }
