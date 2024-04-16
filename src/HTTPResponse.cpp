@@ -128,7 +128,7 @@ bool HTTPResponse::serveIndex(const ServerConfig& serverConfig){
 		return (false);
 }
 
-bool HTTPResponse::serveDefaultFile(const std::string& uri, const std::string& fullPath){
+bool HTTPResponse::serveDefaultFile(const std::string& uri, const std::string& fullPath) {
 		std::string folderNameHtml = fullPath + (fullPath[fullPath.size() - 1] == '/' ? "" : "/") + extractFolderName(uri) + ".html";
 		std::ifstream folderHtmlFile(folderNameHtml.c_str());
 		if (!folderHtmlFile.fail()) {
@@ -142,7 +142,7 @@ bool HTTPResponse::serveDefaultFile(const std::string& uri, const std::string& f
 		return (false);
 }
 
-void HTTPResponse::serveDirectoryListing(const ServerConfig& serverConfig, const std::string& uri, const std::string& fullPath){
+void HTTPResponse::serveDirectoryListing(const ServerConfig& serverConfig, const std::string& uri, const std::string& fullPath) {
 	DIR* dir = opendir(fullPath.c_str());
 	if (dir != NULL) {
 		INFO("Serving Directory Listing of: " << fullPath);
@@ -164,7 +164,7 @@ void HTTPResponse::serveDirectoryListing(const ServerConfig& serverConfig, const
 	}
 }
 
-void HTTPResponse::serveRegularFile(const ServerConfig& serverConfig, const std::string& uri, const std::string& fullPath){
+void HTTPResponse::serveRegularFile(const ServerConfig& serverConfig, const std::string& uri, const std::string& fullPath) {
 	std::ifstream file(fullPath.c_str());
 	if (!file.fail()) {
 		INFO("Serving file: " << fullPath);
@@ -177,7 +177,7 @@ void HTTPResponse::serveRegularFile(const ServerConfig& serverConfig, const std:
 	}
 }
 
-bool HTTPResponse::cheekySlashes(const std::string& uri){
+bool HTTPResponse::cheekySlashes(const std::string& uri) {
 	if (uri.size() == 0)
 		return (true);
 	for (size_t i = 0; i < uri.size(); i++)
