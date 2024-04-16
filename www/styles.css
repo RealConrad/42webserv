@@ -64,7 +64,6 @@ button {
 }
 
 .image-container {
-  display: flex;
   max-width: 1000px;
   max-height: 1000px;
   justify-content: center;
@@ -76,4 +75,5 @@ button {
   max-width: 100%;
   max-height: 100%;
   border-radius: 10px;
+  transform: scale(1);
 }

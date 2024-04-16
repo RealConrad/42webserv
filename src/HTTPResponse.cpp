@@ -21,7 +21,7 @@ void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& Ser
 			handleRequestGET(request, ServerConfig);
 			break;
 		case POST:
-			ERROR("POST REQUEST NOT IMPLEMENTED YET!");
+			handleRequestPOST(request, ServerConfig);
 			break;
 		case DELETE:
 			ERROR("DELETE REQUEST NOT IMPLEMENTED YET!");
@@ -40,10 +40,9 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 		INFO("/get-images endpoint called for server: " << serverConfig.serverName);
 		// TODO: CHANGE THIS TO READ FROM A DIRECTORY MAYBE?
 		std::vector<std::string> images;
-		images.push_back("/data/image1.jpg");
-		images.push_back("/data/image2.jpg");
-		images.push_back("/data/image3.jpg");
-
+		images.push_back("/images/image1.jpg");
+		images.push_back("/images/image2.jpg");
+		images.push_back("/images/image3.jpg");
 		// Get random image
 		std::string imagePath = serverConfig.rootDirectory + images[rand() % images.size()];
 		std::ifstream file(imagePath.c_str());
@@ -58,6 +57,43 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 		}
 	} else {
 		serveFile(serverConfig, requestURI);
+	}
+}
+
+void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerConfig& serverConfig) {
+	std::string requestURI = request.getURI();
+
+	if (requestURI == "/upload-file") {
+		INFO("File upload endpoint called for server: " << serverConfig.serverName);
+		std::string fileContent = request.getBody();
+		std::string fileName = request.getFileName();
+		if (fileName.empty()) {
+			ERROR("No file content or filename provided");
+			assignResponse(400, "Bad Request: No file content or filename provided", "text/html");
+			return;
+		}
+
+		std::string savePath = serverConfig.rootDirectory + "/uploads/" + fileName;
+		std::ofstream outFile(savePath.c_str());
+		if (outFile) {
+			// BLOCK(request.getBody());
+			outFile.write(request.getBody().c_str(), request.getBody().size());
+			outFile.close();
+
+			if (!outFile.fail()) {
+				INFO("File uploaded successfully: " + savePath);
+				assignResponse(200, "File uploaded successfully", "text/html");
+			} else {
+				ERROR("Failed to store file");
+				assignResponse(500, "Internal Server Error. Failed to write file.", "text/html");
+			}
+		} else {
+			ERROR("Unable to open file for writing: " + savePath);
+			assignResponse(500, "Internal Server Error. Unable to open file for writing", "text/html");
+		}
+	} else {
+		WARNING("Unsupported POST request for URI: " + requestURI);
+		assignResponse(404, "The requested URL was not found on this server", "text/html");
 	}
 }
 
@@ -92,7 +128,7 @@ bool HTTPResponse::serveIndex(const ServerConfig& serverConfig){
 		return (false);
 }
 
-bool HTTPResponse::serveDefaultFile(const std::string& uri, const std::string& fullPath){
+bool HTTPResponse::serveDefaultFile(const std::string& uri, const std::string& fullPath) {
 		std::string folderNameHtml = fullPath + (fullPath[fullPath.size() - 1] == '/' ? "" : "/") + extractFolderName(uri) + ".html";
 		std::ifstream folderHtmlFile(folderNameHtml.c_str());
 		if (!folderHtmlFile.fail()) {
@@ -106,7 +142,7 @@ bool HTTPResponse::serveDefaultFile(const std::string& uri, const std::string& f
 		return (false);
 }
 
-void HTTPResponse::serveDirectoryListing(const ServerConfig& serverConfig, const std::string& uri, const std::string& fullPath){
+void HTTPResponse::serveDirectoryListing(const ServerConfig& serverConfig, const std::string& uri, const std::string& fullPath) {
 	DIR* dir = opendir(fullPath.c_str());
 	if (dir != NULL) {
 		INFO("Serving Directory Listing of: " << fullPath);
@@ -128,7 +164,7 @@ void HTTPResponse::serveDirectoryListing(const ServerConfig& serverConfig, const
 	}
 }
 
-void HTTPResponse::serveRegularFile(const ServerConfig& serverConfig, const std::string& uri, const std::string& fullPath){
+void HTTPResponse::serveRegularFile(const ServerConfig& serverConfig, const std::string& uri, const std::string& fullPath) {
 	std::ifstream file(fullPath.c_str());
 	if (!file.fail()) {
 		INFO("Serving file: " << fullPath);
@@ -141,7 +177,7 @@ void HTTPResponse::serveRegularFile(const ServerConfig& serverConfig, const std:
 	}
 }
 
-bool HTTPResponse::cheekySlashes(const std::string& uri){
+bool HTTPResponse::cheekySlashes(const std::string& uri) {
 	if (uri.size() == 0)
 		return (true);
 	for (size_t i = 0; i < uri.size(); i++)

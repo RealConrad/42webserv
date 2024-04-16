@@ -15,7 +15,7 @@ SocketManager::~SocketManager() {
 /*                                 Main Server                                */
 /* -------------------------------------------------------------------------- */
 
-void stopServer(int){
+void stopServer(int) {
 	g_run = false;
 }
 
@@ -59,8 +59,9 @@ void SocketManager::run() {
 					acceptNewConnections(this->fds[i].fd);
 				} else {
 					fds[i].events |= POLLOUT;
-					if (readClientData(fds[i].fd))
+					if (readClientData(fds[i].fd)) {
 						processRequest(fds[i].fd);
+					}
 				}
 			}
 			if (this->fds[i].revents & POLLOUT && !isServerSocket(this->fds[i].fd)) {
@@ -151,11 +152,8 @@ void SocketManager::acceptNewConnections(int server_fd) {
 		ERROR("Error accepting connection");
 		return;
 	}
-
 	this->clientStates[newsockfd] = ClientState();
-
 	fcntl(newsockfd, F_SETFL, O_NONBLOCK | FD_CLOEXEC);
-
 	struct pollfd new_pfd = {newsockfd, POLLIN, 0};
 	this->fds.push_back(new_pfd);
 	time(&clientStates[newsockfd].lastActivity);
@@ -165,19 +163,46 @@ void SocketManager::acceptNewConnections(int server_fd) {
 /* ----------------------------- Handle Requests ---------------------------- */
 
 bool SocketManager::readClientData(int fd) {
-	char buffer[4096 * 10];
-	ssize_t bytesRead = recv(fd, buffer, sizeof(buffer), 0);
+	size_t size = 4096 * 4;
+	char buffer[size];
+	ssize_t bytesRead = recv(fd, buffer, size, 0);
+
 	if (bytesRead > 0) {
 		this->clientStates[fd].readBuffer.append(buffer, bytesRead);
-		if (this->clientStates[fd].readBuffer.find("\r\n\r\n") != std::string::npos) {
+
+		if (!this->clientStates[fd].headersComplete) {
+			size_t headerEndPos = this->clientStates[fd].readBuffer.find("\r\n\r\n");
+			if (headerEndPos != std::string::npos) {
+				this->clientStates[fd].headersComplete = true;
+				this->clientStates[fd].headerEndIndex = headerEndPos + 4;
+
+				// Find and extract Content-Length
+				size_t startPos = this->clientStates[fd].readBuffer.find("Content-Length: ");
+				if (startPos != std::string::npos) {
+					startPos += 16;
+					size_t endPos = this->clientStates[fd].readBuffer.find("\r\n", startPos);
+					std::istringstream iss(this->clientStates[fd].readBuffer.substr(startPos, endPos - startPos));
+					iss >> this->clientStates[fd].contentLength;
+
+					// Calculate already read body length
+					this->clientStates[fd].totalRead = this->clientStates[fd].readBuffer.length() - this->clientStates[fd].headerEndIndex;
+				}
+			}
+		} else {
+			this->clientStates[fd].totalRead += bytesRead;
+		}
+		if (this->clientStates[fd].headersComplete && this->clientStates[fd].totalRead >= this->clientStates[fd].contentLength) {
 			return true;
 		}
+	} else if (bytesRead == 0) {
+		clientStates[fd].closeConnection = true;
 	} else if (bytesRead < 0) {
 		ERROR("Failed to read from recv()");
 		clientStates[fd].closeConnection = true;
 	}
 	return false;
 }
+
 
 /* ---------------------------- Handle Responses ---------------------------- */
 
@@ -189,7 +214,6 @@ void SocketManager::processRequest(int fd) {
 	else
 		clientStates[fd].keepAlive = false;
 	const ServerConfig& serverConfig = getCurrentServer(request);
-
 	try {
 		HTTPResponse response;
 		response.prepareResponse(request, serverConfig);
@@ -223,6 +247,7 @@ void SocketManager::sendResponse(pollfd &fd) {
 		clientStates[fd.fd].closeConnection = true;
 	}
 }
+
 /* -------------------------------------------------------------------------- */
 /*                              Helper Functions                              */
 /* -------------------------------------------------------------------------- */

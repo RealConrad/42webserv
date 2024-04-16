@@ -4,6 +4,7 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <ctime>
 
 enum RequestTypes {
 	GET,
@@ -21,10 +22,14 @@ enum SectionTypes {
 struct ClientState {
 	std::string readBuffer;
 	std::string writeBuffer;
+	size_t totalRead;
+	size_t contentLength;
+	size_t headerEndIndex;
+	bool headersComplete;
 	bool keepAlive;
 	time_t lastActivity;
 	bool closeConnection;
-	ClientState() : closeConnection(false){};
+	ClientState() : totalRead(0), contentLength(0), headerEndIndex(0), headersComplete(false), closeConnection(false)  {};
 };
 
 struct LocationConfig {
