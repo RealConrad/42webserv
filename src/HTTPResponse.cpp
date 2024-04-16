@@ -67,7 +67,7 @@ void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerCon
         INFO("File upload endpoint called for server: " << serverConfig.serverName);
         std::string fileContent = request.getBody();
         std::string fileName = request.getFileName();
-        if (fileContent.empty() || fileName.empty()) {
+        if (fileName.empty()) {
             ERROR("No file content or filename provided");
             assignResponse(400, "Bad Request: No file content or filename provided", "text/html");
             return;
