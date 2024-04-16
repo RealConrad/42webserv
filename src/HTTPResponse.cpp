@@ -35,8 +35,10 @@ void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& Ser
 
 void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConfig& serverConfig) {
 	std::string requestURI = request.getURI();
+	static int lol = 0;
 	
 	if (requestURI == "/get-images") {
+		lol++;
 		INFO("/get-images endpoint called for server: " << serverConfig.serverName);
 		// TODO: CHANGE THIS TO READ FROM A DIRECTORY MAYBE?
 		std::vector<std::string> images;
@@ -44,7 +46,7 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 		images.push_back("/images/image2.jpg");
 		images.push_back("/images/image3.jpg");
 		// Get random image
-		std::string imagePath = serverConfig.rootDirectory + images[rand() % images.size()];
+		std::string imagePath = serverConfig.rootDirectory + images[lol % images.size()];
 		std::ifstream file(imagePath.c_str());
 		INFO("Serving image: " << imagePath);
 		if (file) {
@@ -76,7 +78,6 @@ void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerCon
 		std::string savePath = serverConfig.rootDirectory + "/uploads/" + fileName;
 		std::ofstream outFile(savePath.c_str());
 		if (outFile) {
-			// BLOCK(request.getBody());
 			outFile.write(request.getBody().c_str(), request.getBody().size());
 			outFile.close();
 
@@ -226,7 +227,7 @@ void HTTPResponse::assignPageNotFoundContent(const ServerConfig& serverConfig) {
 
 void HTTPResponse::assignResponse(int statusCode, const std::string& body, std::string contentType) {
 	setHeader("Content-Type", contentType);
-	setHeader("Content-Length", ::toString(body.size() - 1));
+	setHeader("Content-Length", ::toString(body.size()));
 	setHeader("Connection", "keep-alive");
 	setHeader("Keep-Alive", "timeout=60, max=50");
 	setBody(body);

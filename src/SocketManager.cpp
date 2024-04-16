@@ -218,6 +218,7 @@ void SocketManager::processRequest(int fd) {
 		HTTPResponse response;
 		response.prepareResponse(request, serverConfig);
 		clientStates[fd].writeBuffer = response.convertToString();
+		clientStates[fd].readBuffer.clear();
 	} catch (const std::runtime_error& e) {
 		ERROR(e.what());
 	}
