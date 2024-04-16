@@ -19,19 +19,6 @@ enum SectionTypes {
 	UNKNOWN,
 };
 
-struct ClientState {
-	std::string readBuffer;
-	std::string writeBuffer;
-	size_t totalRead;
-	size_t contentLength;
-	size_t headerEndIndex;
-	bool headersComplete;
-	bool keepAlive;
-	time_t lastActivity;
-	bool closeConnection;
-	ClientState() : totalRead(0), contentLength(0), headerEndIndex(0), headersComplete(false), closeConnection(false)  {};
-};
-
 struct LocationConfig {
 	std::vector<RequestTypes> allowedRequestTypes;
 	std::string locationPath;
@@ -46,6 +33,22 @@ struct ServerConfig {
 	bool directoryListing;
 	std::vector<LocationConfig> locations;
 };
+
+struct ClientState {
+	std::string readBuffer;
+	std::string writeBuffer;
+	size_t totalRead;
+	size_t contentLength;
+	size_t headerEndIndex;
+	bool headersComplete;
+	bool keepAlive;
+	time_t lastActivity;
+	bool closeConnection;
+	int serverPort;
+	ServerConfig serverConfig;
+	ClientState() : totalRead(0), contentLength(0), headerEndIndex(0), headersComplete(false), closeConnection(false)  {};
+};
+
 
 struct HTTPConfig {
 	std::vector<ServerConfig> serverConfigs;

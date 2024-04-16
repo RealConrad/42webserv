@@ -96,14 +96,27 @@ void SocketManager::run() {
 /*                               Set Up Sockets                               */
 /* -------------------------------------------------------------------------- */
 
+bool SocketManager::portExists(std::vector<int> &ports, int port){
+	for (size_t i = 0; i < ports.size(); i++) {
+		if (ports[i] == port)
+			return true;
+	}
+	return false;
+}
+
 void SocketManager::setupServerSockets() {
 	INFO("Setting up server sockets");
+	std::vector<int> ports;
 	for (size_t i = 0; i < this->config.serverConfigs.size(); i++) {
+		if (portExists(ports, this->config.serverConfigs[i].listenPort))
+			continue;
 		int sockfd = createAndBindSocket(this->config.serverConfigs[i].listenPort);
 		if (sockfd >= 0) {
+			ports.push_back(this->config.serverConfigs[i].listenPort);
 			struct pollfd pfd = {sockfd, POLLIN, 0};
 			this->fds.push_back(pfd);
 			this->server_fds.push_back(sockfd);
+			this->serverConfigs[sockfd] = this->config.serverConfigs[i];
 		}
 	}
 }
@@ -157,6 +170,7 @@ void SocketManager::acceptNewConnections(int server_fd) {
 	struct pollfd new_pfd = {newsockfd, POLLIN, 0};
 	this->fds.push_back(new_pfd);
 	time(&clientStates[newsockfd].lastActivity);
+	clientStates[newsockfd].serverPort = this->serverConfigs[server_fd].listenPort;
 	SUCCESS("Server socket *" << server_fd << "* Accepted new connection on socket *" << newsockfd << "*");
 }
 
@@ -213,11 +227,12 @@ void SocketManager::processRequest(int fd) {
 		clientStates[fd].keepAlive = true;
 	else
 		clientStates[fd].keepAlive = false;
-	const ServerConfig& serverConfig = getCurrentServer(request);
 	try {
+		clientStates[fd].serverConfig = getCurrentServer(request, clientStates[fd].serverPort);
 		HTTPResponse response;
-		response.prepareResponse(request, serverConfig);
+		response.prepareResponse(request, clientStates[fd].serverConfig);
 		clientStates[fd].writeBuffer = response.convertToString();
+		clientStates[fd].readBuffer.clear();
 	} catch (const std::runtime_error& e) {
 		ERROR(e.what());
 	}
@@ -252,18 +267,26 @@ void SocketManager::sendResponse(pollfd &fd) {
 /*                              Helper Functions                              */
 /* -------------------------------------------------------------------------- */
 
-ServerConfig& SocketManager::getCurrentServer(const HTTPRequest& request) {
+ServerConfig& SocketManager::getCurrentServer(const HTTPRequest& request, int port) {
 	std::string hostName = request.getHeader("Host");
 
 	size_t colonPos = hostName.find(":");
 	if (colonPos != std::string::npos) {
 		hostName = hostName.substr(0, colonPos);
 	}
+	bool defaultConfig = false;
+	std::vector<ServerConfig>::iterator ogConfig;
 	for (std::vector<ServerConfig>::iterator iter = this->config.serverConfigs.begin(); iter != this->config.serverConfigs.end(); iter++) {
-		if (iter->serverName == hostName) {
+		if (!defaultConfig && iter->listenPort == port){
+			defaultConfig = true;
+			ogConfig = iter;
+		}
+		if (iter->listenPort == port && iter->serverName == hostName) {
 			return *iter;
 		}
 	}
+	if (defaultConfig)
+		return *ogConfig;
 	throw std::runtime_error("Server config not found for host: " + hostName);
 }
 
