@@ -13,7 +13,9 @@ void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& Ser
 	std::string method = request.getMethod();
 
 	if (!isMethodAllowed(method, request.getURI(), ServerConfig)) {
-		throw std::runtime_error("Method '" + method + "' not allowed for server '" + ServerConfig.serverName + "'");
+		assignResponse(405, "<html><h1>405 Method not allowed</h1></html>", "text/html");
+		ERROR("Method '" << method << "' not allowed for server '" << ServerConfig.serverName << "'");
+		return;
 	}
 
 	switch (stringToRequestType(method)) {
@@ -116,7 +118,7 @@ std::string HTTPResponse::extractFolderName(const std::string& uri) {
 }
 
 bool HTTPResponse::serveIndex(const ServerConfig& serverConfig){
-		std::string indexPath = serverConfig.rootDirectory + (serverConfig.rootDirectory[serverConfig.rootDirectory.size() - 1] == '/' ? "" : "/") + "index.html";
+		std::string indexPath = serverConfig.rootDirectory + (serverConfig.rootDirectory[serverConfig.rootDirectory.size() - 1] == '/' ? "" : "/") + serverConfig.indexFile;
 		std::ifstream indexFile(indexPath.c_str());
 		if (!indexFile.fail()) {
 			INFO("Serving index: " << indexPath);
@@ -257,17 +259,29 @@ std::string HTTPResponse::convertToString() const {
 }
 
 bool HTTPResponse::isMethodAllowed(const std::string& method, const std::string& uri, const ServerConfig& serverConfig) {
+	const LocationConfig* mostSpecificMatch = NULL;
+	// Iterate over the location configurations to find the most specific matching location block
 	for (std::vector<LocationConfig>::const_iterator it = serverConfig.locations.begin(); it != serverConfig.locations.end(); ++it) {
-		if (uri.find(it->locationPath) == 0) {
-			for (std::vector<RequestTypes>::const_iterator iter = it->allowedRequestTypes.begin(); iter != it->allowedRequestTypes.end(); ++iter) {
-				if (method == requestTypeToString(*iter)) {
-					return true;
-				}
+		if (uri.find(it->locationPath) == 0) {  // Check if the URI starts with the location path
+			if (!mostSpecificMatch || it->locationPath.length() > mostSpecificMatch->locationPath.length()) {
+				mostSpecificMatch = &(*it);  // Update to the more specific location match
 			}
-			// If the URI matches but the method is not allowed, return false
-			return false;
 		}
 	}
+	// Check the found most specific location
+	if (mostSpecificMatch) {
+		if (mostSpecificMatch->allowedRequestTypes.empty()) {
+			return false;  // If no types are allowed, return false
+		}
+		// Check if the method is allowed in the most specific location
+		for (std::vector<RequestTypes>::const_iterator iter = mostSpecificMatch->allowedRequestTypes.begin(); iter != mostSpecificMatch->allowedRequestTypes.end(); ++iter) {
+			if (method == requestTypeToString(*iter)) {
+				return true;
+			}
+		}
+		return false;  // If method not found in the allowed types, return false
+	}
+	// Default to false if no location configuration matches the URI
 	return false;
 }
 

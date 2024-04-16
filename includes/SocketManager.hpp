@@ -26,14 +26,16 @@ class SocketManager {
 		std::vector<struct pollfd> fds;
 		std::vector<int> server_fds;
 		std::map<int, ClientState> clientStates;
+		std::map<int, ServerConfig> serverConfigs;
 
 		void acceptNewConnections(int server_fd);
 		void closeConnection(int fd);
 		int createAndBindSocket(int port);
 		void addServerFd(int fd);
 		bool isServerSocket(int fd);
-		ServerConfig& getCurrentServer(const HTTPRequest& request);
+		ServerConfig& getCurrentServer(const HTTPRequest& request, int port);
 
+		bool portExists(std::vector<int> &ports, int port);
 		void sendResponse(pollfd &fd);
 		bool readClientData(int fd);
 		void processRequest(int fd);
