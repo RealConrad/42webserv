@@ -6,6 +6,8 @@
 #include <iostream>
 #include <map>
 #include <algorithm>
+#include <fstream>
+#include <vector>
 #include "Logger.hpp"
 #include "Utils.hpp"
 
@@ -23,6 +25,7 @@ class HTTPRequest {
         void parseBody(std::istringstream& stream);
         std::string extractHeaderValue(const std::string& header, const std::string& key);
 		void parseMultipartFile(std::istream& stream, const std::string& boundary);
+		void parseMultipartHeaders(const std::vector<char>& buffer);
         std::string extractBoundary(const std::string& contentType) const;
     public:
         HTTPRequest();

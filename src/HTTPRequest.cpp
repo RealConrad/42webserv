@@ -58,62 +58,51 @@ void HTTPRequest::parseBody(std::istringstream& stream) {
 /*                                File parsing                                */
 /* -------------------------------------------------------------------------- */
 
-#include <iostream>
-#include <fstream>
-#include <vector>
-#include <string>
-
 void HTTPRequest::parseMultipartFile(std::istream& stream, const std::string& boundary) {
-    std::string boundaryString = "\r\n" + boundary;
-    std::vector<char> boundaryBytes(boundaryString.begin(), boundaryString.end());
-    std::vector<char> buffer;
-    bool readingHeaders = true;
-    std::string filename;
-    std::string contentType;
-    std::vector<char> fileContent;
+	std::string boundaryString = "\r\n" + boundary;
+	std::vector<char> boundaryBytes(boundaryString.begin(), boundaryString.end());
+	std::vector<char> buffer;
+	bool readingHeaders = true;
+	std::vector<char> fileContent;
 
-    char ch;
-    while (stream.get(ch)) {
-        buffer.push_back(ch);
+	char ch;
+	while (stream.get(ch)) {
+		buffer.push_back(ch);
+		if (readingHeaders) {
+			if (buffer.size() > 4 && std::equal(buffer.end() - 4, buffer.end(), "\r\n\r\n")) {
+				parseMultipartHeaders(buffer);
+				readingHeaders = false;
+				buffer.clear();
+				continue;
+			}
+		} else {
+			 if (std::equal(boundaryBytes.begin(), boundaryBytes.end(), buffer.end() - boundaryBytes.size())) {
+				// Stop capturing file content just before the boundary
+				fileContent.insert(fileContent.end(), buffer.begin(), buffer.end() - boundaryBytes.size());
+				break;
+			}
+		}
+	}
+	this->body.assign(fileContent.begin(), fileContent.end());
+}
 
-        if (readingHeaders) {
-            // Check if we reached the end of headers
-            if (buffer.size() > 4 && std::equal(buffer.end() - 4, buffer.end(), "\r\n\r\n")) {
-                std::string headers(buffer.begin(), buffer.end() - 4); // Exclude the last \r\n\r\n
-                std::istringstream headerStream(headers);
-                std::string line;
-                while (std::getline(headerStream, line)) {
-                    if (line.find("Content-Disposition:") != std::string::npos) {
-                        size_t namePos = line.find("filename=\"");
-                        if (namePos != std::string::npos) {
-                            namePos += 10; // Length of 'filename="'
-                            size_t endPos = line.find("\"", namePos);
-                            filename = line.substr(namePos, endPos - namePos);
-                        }
-                    } else if (line.find("Content-Type:") != std::string::npos) {
-                        size_t startPos = line.find(":") + 2;
-                        contentType = line.substr(startPos);
-                    }
-                }
-                // Prepare to read file content
-                readingHeaders = false;
-                buffer.clear(); // Clear the buffer to start fresh for content
-                continue; // Skip the rest of the loop to start content capture
-            }
-        } else {
-            // Check for boundary indicating the end of the file content
-            if (buffer.size() >= boundaryBytes.size() &&
-                std::equal(boundaryBytes.begin(), boundaryBytes.end(), buffer.end() - boundaryBytes.size())) {
-                // Stop capturing file content just before the boundary
-                fileContent.insert(fileContent.end(), buffer.begin(), buffer.end() - boundaryBytes.size());
-                break;
-            }
-        }
-    }
-
-    this->fileName = filename;
-    this->fileContentType = contentType;
-    this->body.assign(fileContent.begin(), fileContent.end());
+void HTTPRequest::parseMultipartHeaders(const std::vector<char>& buffer) {
+	std::string headers(buffer.begin(), buffer.end() - 4); // Exclude the last \r\n\r\n
+	std::istringstream headerStream(headers);
+	std::string line;
+	while (std::getline(headerStream, line)) {
+		if (line.find("Content-Disposition:") != std::string::npos) {
+			size_t namePos = line.find("filename=\"");
+			if (namePos != std::string::npos) {
+				namePos += 10;
+				size_t endPos = line.find("\"", namePos);
+				this->fileName = line.substr(namePos, endPos - namePos);
+			}
+		} else if (line.find("Content-Type:") != std::string::npos) {
+			size_t startPos = line.find(":") + 2;
+			this->fileContentType = line.substr(startPos);
+		}
+	}
 }
 
 std::string HTTPRequest::extractBoundary(const std::string& contentType) const {
@@ -137,6 +126,13 @@ std::string HTTPRequest::extractBoundary(const std::string& contentType) const {
 /*                              Getter Functions                              */
 /* -------------------------------------------------------------------------- */
 
+std::string HTTPRequest::getHeader(const std::string& name) const {
+	std::map<std::string, std::string>::const_iterator iter = this->headers.find(name);
+	if (iter != this->headers.end())
+		return iter->second;
+	return "";
+}
+
 std::string HTTPRequest::getMethod() const {
 	return this->method;
 }
@@ -159,11 +155,4 @@ std::string HTTPRequest::getFileName() const {
 
 std::string HTTPRequest::getFileContentType() const {
 	return this->fileContentType;
-}
-
-std::string HTTPRequest::getHeader(const std::string& name) const {
-	std::map<std::string, std::string>::const_iterator iter = this->headers.find(name);
-	if (iter != this->headers.end())
-		return iter->second;
-	return "";
 }
