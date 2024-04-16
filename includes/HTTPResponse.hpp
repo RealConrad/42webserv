@@ -30,6 +30,12 @@ class HTTPResponse {
         void handleRequestGET(const HTTPRequest& request, const ServerConfig& serverConfig);
 		void handleRequestPOST(const HTTPRequest& request, const ServerConfig& serverConfig);
         void assignPageNotFoundContent(const ServerConfig& serverConfig);
+		std::string extractFolderName(const std::string& uri);
+        bool serveIndex(const ServerConfig& serverConfig);
+        bool serveDefaultFile(const std::string& uri, const std::string& fullPath);
+        void serveDirectoryListing(const ServerConfig& serverConfig, const std::string& uri, const std::string& fullPath);
+        void serveRegularFile(const ServerConfig& serverConfig, const std::string& uri, const std::string& fullPath);
+		bool cheekySlashes(const std::string& uri);
         
         /* -------------------------------------------------------------------------- */
         /*                                   Setters                                  */
