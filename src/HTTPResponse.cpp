@@ -61,40 +61,40 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 }
 
 void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerConfig& serverConfig) {
-    std::string requestURI = request.getURI();
+	std::string requestURI = request.getURI();
 
-    if (requestURI == "/upload-file") {
-        INFO("File upload endpoint called for server: " << serverConfig.serverName);
-        std::string fileContent = request.getBody();
-        std::string fileName = request.getFileName();
-        if (fileName.empty()) {
-            ERROR("No file content or filename provided");
-            assignResponse(400, "Bad Request: No file content or filename provided", "text/html");
-            return;
-        }
+	if (requestURI == "/upload-file") {
+		INFO("File upload endpoint called for server: " << serverConfig.serverName);
+		std::string fileContent = request.getBody();
+		std::string fileName = request.getFileName();
+		if (fileName.empty()) {
+			ERROR("No file content or filename provided");
+			assignResponse(400, "Bad Request: No file content or filename provided", "text/html");
+			return;
+		}
 
-        std::string savePath = serverConfig.rootDirectory + "/uploads/" + fileName;
-        std::ofstream outFile(savePath.c_str());
-        if (outFile) {
+		std::string savePath = serverConfig.rootDirectory + "/uploads/" + fileName;
+		std::ofstream outFile(savePath.c_str());
+		if (outFile) {
 			// BLOCK(request.getBody());
-            outFile.write(request.getBody().c_str(), request.getBody().size());
-            outFile.close();
+			outFile.write(request.getBody().c_str(), request.getBody().size());
+			outFile.close();
 
-            if (!outFile.fail()) {
-                INFO("File uploaded successfully: " + savePath);
-                assignResponse(200, "File uploaded successfully", "text/html");
-            } else {
-                ERROR("Failed to store file");
-                assignResponse(500, "Internal Server Error. Failed to write file.", "text/html");
-            }
-        } else {
-            ERROR("Unable to open file for writing: " + savePath);
-            assignResponse(500, "Internal Server Error. Unable to open file for writing", "text/html");
-        }
-    } else {
-        WARNING("Unsupported POST request for URI: " + requestURI);
-        assignResponse(404, "The requested URL was not found on this server", "text/html");
-    }
+			if (!outFile.fail()) {
+				INFO("File uploaded successfully: " + savePath);
+				assignResponse(200, "File uploaded successfully", "text/html");
+			} else {
+				ERROR("Failed to store file");
+				assignResponse(500, "Internal Server Error. Failed to write file.", "text/html");
+			}
+		} else {
+			ERROR("Unable to open file for writing: " + savePath);
+			assignResponse(500, "Internal Server Error. Unable to open file for writing", "text/html");
+		}
+	} else {
+		WARNING("Unsupported POST request for URI: " + requestURI);
+		assignResponse(404, "The requested URL was not found on this server", "text/html");
+	}
 }
 
 std::string HTTPResponse::extractFolderName(const std::string& uri) {
