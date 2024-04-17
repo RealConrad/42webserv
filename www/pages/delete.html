@@ -21,18 +21,24 @@ const fetchFiles = () => {
 		if (fileList) {
 			fileList.remove();
 		}
-		fileList = document.createElement('ul');
-		fileList.id = "fileList";
-		files.forEach(file => {
-			const li = document.createElement('li');
-			li.textContent = file;
-			const deleteButton = document.createElement('button');
-			deleteButton.textContent = 'X';
-			deleteButton.onclick = () => deleteFile(file);
-			li.appendChild(deleteButton);
-			fileList.appendChild(li);
-		});
-		document.body.appendChild(fileList);
+		if (files.length === 0) {
+			const noFilesMsg = document.createElement('p');
+            noFilesMsg.textContent = "No files found. Please upload some files first!";
+            document.body.appendChild(noFilesMsg);
+		} else {
+			fileList = document.createElement('ul');
+			fileList.id = "fileList";
+			files.forEach(file => {
+				const li = document.createElement('li');
+				li.textContent = file;
+				const deleteButton = document.createElement('button');
+				deleteButton.textContent = 'X';
+				deleteButton.onclick = () => deleteFile(file);
+				li.appendChild(deleteButton);
+				fileList.appendChild(li);
+			});
+			document.body.appendChild(fileList);
+		}
 	})
 	.catch((e) => {
 		console.log(e);

@@ -9,24 +9,24 @@ HTTPResponse::HTTPResponse() {}
 
 HTTPResponse::~HTTPResponse() {}
 
-void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& ServerConfig) {
+void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& serverConfig) {
 	std::string method = request.getMethod();
-
-	if (!isMethodAllowed(method, request.getURI(), ServerConfig)) {
+	// std::string uri = request.getURI();
+	if (!isMethodAllowed(method, request.getURI(), serverConfig)) {
 		assignResponse(405, "<html><h1>405 Method not allowed</h1></html>", "text/html");
-		ERROR("Method '" << method << "' not allowed for server '" << ServerConfig.serverName << "'");
+		ERROR("Method '" << method << "' not allowed for server '" << serverConfig.serverName << "'");
 		return;
 	}
 
 	switch (stringToRequestType(method)) {
 		case GET:
-			handleRequestGET(request, ServerConfig);
+			handleRequestGET(request, serverConfig);
 			break;
 		case POST:
-			handleRequestPOST(request, ServerConfig);
+			handleRequestPOST(request, serverConfig);
 			break;
 		case DELETE:
-			handleRequestDELETE(request, ServerConfig);
+			handleRequestDELETE(request, serverConfig);
 			break;
 		default:
 			assignResponse(501, "Method is not supported: " + method, "application/json");
@@ -43,6 +43,9 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 		image++;
 		INFO("/get-images endpoint called for server: " << serverConfig.serverName);
 		std::vector<std::string> images;
+		images.push_back("/images/image1.jpg");
+		images.push_back("/images/image2.jpg");
+		images.push_back("/images/image3.jpg");
 		std::string imagePath = serverConfig.rootDirectory + images[image % images.size()];
 		std::ifstream file(imagePath.c_str());
 		INFO("Serving image: " << imagePath);
