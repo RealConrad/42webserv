@@ -29,7 +29,7 @@ void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& Ser
 			handleRequestDELETE(request, ServerConfig);
 			break;
 		default:
-			// TODO: SEND ERROR BACK TO CLIENT
+			assignResponse(501, "Method is not supported: " + method, "application/json");
 			throw std::runtime_error("Method '" + method + "' not implemented");
 			break;
 	}
