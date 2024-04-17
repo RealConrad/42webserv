@@ -48,7 +48,15 @@ struct ClientState {
 	bool closeConnection;
 	int serverPort;
 	ServerConfig serverConfig;
-	ClientState() : totalRead(0), contentLength(0), headerEndIndex(0), headersComplete(false), closeConnection(false)  {};
+	bool assignedConfig;
+	ClientState() :
+		totalRead(0),
+		contentLength(0), 
+		headerEndIndex(0), 
+		headersComplete(false), 
+		closeConnection(false),
+		assignedConfig(false)
+	{};
 };
 
 
