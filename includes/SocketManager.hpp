@@ -31,7 +31,6 @@ class SocketManager {
 		void acceptNewConnections(int server_fd);
 		void closeConnection(int fd);
 		int createAndBindSocket(int port);
-		void addServerFd(int fd);
 		bool isServerSocket(int fd);
 		ServerConfig& getCurrentServer(const HTTPRequest& request, int port);
 

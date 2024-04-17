@@ -36,6 +36,12 @@ struct ServerConfig {
 	int sendTimeout;
 };
 
+struct HTTPConfig {
+	std::vector<ServerConfig> serverConfigs;
+	int server_timeout_time;
+	int keepAliveTimeout;
+};
+
 struct ClientState {
 	std::string readBuffer;
 	std::string writeBuffer;
@@ -57,12 +63,6 @@ struct ClientState {
 		closeConnection(false),
 		assignedConfig(false)
 	{};
-};
-
-
-struct HTTPConfig {
-	std::vector<ServerConfig> serverConfigs;
-	int server_timeout_time;
 };
 
 #endif

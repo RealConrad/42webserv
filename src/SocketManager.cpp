@@ -189,8 +189,8 @@ void SocketManager::acceptNewConnections(int server_fd) {
 	fcntl(newsockfd, F_SETFL, O_NONBLOCK | FD_CLOEXEC);
 	struct pollfd new_pfd = {newsockfd, POLLIN, 0};
 	this->fds.push_back(new_pfd);
-	time(&clientStates[newsockfd].lastActivity);
-	clientStates[newsockfd].serverPort = this->serverConfigs[server_fd].listenPort;
+	time(&this->clientStates[newsockfd].lastActivity);
+	this->clientStates[newsockfd].serverPort = this->serverConfigs[server_fd].listenPort;
 	SUCCESS("Server socket *" << server_fd << "* Accepted new connection on socket *" << newsockfd << "*");
 }
 
@@ -229,10 +229,10 @@ bool SocketManager::readClientData(int fd) {
 			return true;
 		}
 	} else if (bytesRead == 0) {
-		clientStates[fd].closeConnection = true;
+		this->clientStates[fd].closeConnection = true;
 	} else if (bytesRead < 0) {
 		ERROR("Failed to read from recv()");
-		clientStates[fd].closeConnection = true;
+		this->clientStates[fd].closeConnection = true;
 	}
 	return false;
 }
@@ -244,37 +244,37 @@ void SocketManager::processRequest(int fd) {
 	HTTPRequest request(this->clientStates[fd].readBuffer);
 	std::string keepAlive = request.getHeader("Connection");
 	if (keepAlive == "keep-alive")
-		clientStates[fd].keepAlive = true;
+		this->clientStates[fd].keepAlive = true;
 	else
-		clientStates[fd].keepAlive = false;
+		this->clientStates[fd].keepAlive = false;
 	try {
 		clientStates[fd].serverConfig = getCurrentServer(request, clientStates[fd].serverPort);
 		clientStates[fd].assignedConfig = true;
 		HTTPResponse response;
-		response.prepareResponse(request, clientStates[fd].serverConfig);
-		clientStates[fd].writeBuffer = response.convertToString();
-		clientStates[fd].readBuffer.clear();
+		response.prepareResponse(request, this->clientStates[fd].serverConfig);
+		this->clientStates[fd].writeBuffer = response.convertToString();
+		this->clientStates[fd].readBuffer.clear();
 	} catch (const std::runtime_error& e) {
 		ERROR(e.what());
 	}
 }
 
 void SocketManager::sendResponse(pollfd &fd) {
-	if (clientStates[fd.fd].writeBuffer.empty()) {
+	if (this->clientStates[fd.fd].writeBuffer.empty()) {
 		WARNING("Nothing to send on socket *" << fd.fd << "*");
 		fd.events = POLLIN;
 		clientStates[fd.fd].assignedConfig = false;
 		return;
 	}
-	ssize_t bytesWritten = send(fd.fd, clientStates[fd.fd].writeBuffer.c_str(), clientStates[fd.fd].writeBuffer.size(), 0);
+	ssize_t bytesWritten = send(fd.fd, this->clientStates[fd.fd].writeBuffer.c_str(), this->clientStates[fd.fd].writeBuffer.size(), 0);
 	if (bytesWritten > 0) {
-		clientStates[fd.fd].writeBuffer.erase(0, bytesWritten);
-		if (clientStates[fd.fd].writeBuffer.empty()) {
+		this->clientStates[fd.fd].writeBuffer.erase(0, bytesWritten);
+		if (this->clientStates[fd.fd].writeBuffer.empty()) {
 			fd.events = POLLIN;
 			SUCCESS("Response sent successfully on socket *" << fd.fd << "*");
-			if(clientStates[fd.fd].keepAlive == false){
+			if (this->clientStates[fd.fd].keepAlive == false) {
 				WARNING("Non-keep-alive connection termination on socket *" << fd.fd << "*");
-				clientStates[fd.fd].closeConnection = true;
+				this->clientStates[fd.fd].closeConnection = true;
 			}
 		clientStates[fd.fd].assignedConfig = false;
 		}
@@ -282,7 +282,7 @@ void SocketManager::sendResponse(pollfd &fd) {
 		WARNING("No data was sent for socket *" << fd.fd << "*");
 	} else {
 		ERROR("Failed to send response for socket *" << fd.fd << "*");
-		clientStates[fd.fd].closeConnection = true;
+		this->clientStates[fd.fd].closeConnection = true;
 	}
 }
 
@@ -339,10 +339,6 @@ void SocketManager::closeConnection(int fd) {
 	}
 }
 
-void SocketManager::addServerFd(int fd) {
-	server_fds.push_back(fd);
-}
-
 bool SocketManager::isServerSocket(int fd) {
-	return std::find(server_fds.begin(), server_fds.end(), fd) != server_fds.end();
+	return std::find(this->server_fds.begin(), this->server_fds.end(), fd) != this->server_fds.end();
 }
