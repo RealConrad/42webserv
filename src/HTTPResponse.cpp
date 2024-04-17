@@ -56,7 +56,7 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 		}
 	} else if (requestURI == "/get-files") {
 		INFO("/get-files endpoint called for server: " << serverConfig.serverName);
-		std::string dirPath = serverConfig.rootDirectory + "/delete"; 
+		std::string dirPath = serverConfig.rootDirectory + "/uploads"; 
 		DIR *dir = opendir(dirPath.c_str());
 		if (dir) {
 			std::vector<std::string> fileNames;
@@ -128,7 +128,7 @@ void HTTPResponse::handleRequestDELETE(const HTTPRequest& request, const ServerC
 	if (requestURI == "/delete-file") {
 		INFO("File delete endpoint called for server: " << serverConfig.serverName);
 		std::string fileName = request.getBody();
-		std::string filePath = serverConfig.rootDirectory + "/delete/" +  fileName; 
+		std::string filePath = serverConfig.rootDirectory + "/uploads/" +  fileName; 
 		if (access(filePath.c_str(), F_OK) != 0) {
 			ERROR("File does not exist: " + filePath);
 			assignResponse(404, "File does not exist", "application/json");
