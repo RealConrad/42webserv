@@ -1,19 +1,34 @@
 #include "HTTPResponse.hpp"
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <dirent.h>
+const std::map<int, std::string> HTTPResponse::statusCodes = HTTPResponse::initializeStatusCodes();
 
 HTTPResponse::HTTPResponse() {}
 
 HTTPResponse::~HTTPResponse() {}
 
+std::map<int, std::string> HTTPResponse::initializeStatusCodes() {
+	std::map<int, std::string> statusCodes;
+	statusCodes[200] = "OK";
+	statusCodes[201] = "Created";
+	statusCodes[202] = "Accepted";
+	statusCodes[301] = "Moved Permanently";
+	statusCodes[302] = "Found";
+	statusCodes[400] = "Bad Request";
+	statusCodes[403] = "Forbidden";
+	statusCodes[404] = "Not Found";
+	statusCodes[405] = "Method Not Allowed";
+	statusCodes[408] = "Request Timeout";
+	statusCodes[500] = "Internal Server Error";
+	statusCodes[501] = "Not Implemented";
+	statusCodes[504] = "Gateway Timeout";
+	return statusCodes;
+}
+
 void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& serverConfig) {
 	std::string method = request.getMethod();
 	// std::string uri = request.getURI();
 	if (!isMethodAllowed(method, request.getURI(), serverConfig)) {
-		assignResponse(405, "<html><h1>405 Method not allowed</h1></html>", "text/html");
+		assignGenericResponse(405);
 		ERROR("Method '" << method << "' not allowed for server '" << serverConfig.serverName << request.getURI() <<"'");
 		return;
 	}
@@ -29,7 +44,7 @@ void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& ser
 			handleRequestDELETE(request, serverConfig);
 			break;
 		default:
-			assignResponse(501, "Method is not supported: " + method, "text/html");
+			assignGenericResponse(501);
 			throw std::runtime_error("Method '" + method + "' not implemented");
 			break;
 	}
@@ -57,98 +72,83 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 			WARNING("Image: '" << imagePath << "' not found. Serving 404 page");
 			assignPageNotFoundContent(serverConfig);
 		}
-	} else if (requestURI == "/get-files") {
-		INFO("/get-files endpoint called for server: " << serverConfig.serverName);
-		std::string dirPath = serverConfig.rootDirectory + "/uploads"; 
-		DIR *dir = opendir(dirPath.c_str());
-		if (dir) {
-			std::vector<std::string> fileNames;
-			struct dirent* entry;
-			while (true) {
-				entry = readdir(dir);
-				if (!entry)
-					break;
-				if (entry->d_name[0] == '.')
-					continue;
-				fileNames.push_back(entry->d_name);
-			}
-			std::string json = "[";
-			for (size_t i = 0; i < fileNames.size(); ++i) {
-				json += "\"" + fileNames[i] + "\"";
-				if (i < fileNames.size() - 1)
-					json += ", ";
-			}
-			json += "]";
-			assignResponse(200, json, "application/json");
-		} else {
-			ERROR("Directory path not found: " << dirPath);
-			assignPageNotFoundContent(serverConfig);
-		}
 	} else {
 		serveFile(serverConfig, requestURI);
 	}
 }
 
+//TODO: DELETE
+	// else if (requestURI == "/get-files") {
+	// 	INFO("/get-files endpoint called for server: " << serverConfig.serverName);
+	// 	std::string dirPath = serverConfig.rootDirectory + "/uploads"; 
+	// 	DIR *dir = opendir(dirPath.c_str());
+	// 	if (dir) {
+	// 		std::vector<std::string> fileNames;
+	// 		struct dirent* entry;
+	// 		while (true) {
+	// 			entry = readdir(dir);
+	// 			if (!entry)
+	// 				break;
+	// 			if (entry->d_name[0] == '.')
+	// 				continue;
+	// 			fileNames.push_back(entry->d_name);
+	// 		}
+	// 		std::string json = "[";
+	// 		for (size_t i = 0; i < fileNames.size(); ++i) {
+	// 			json += "\"" + fileNames[i] + "\"";
+	// 			if (i < fileNames.size() - 1)
+	// 				json += ", ";
+	// 		}
+	// 		json += "]";
+	// 		assignResponse(200, json, "application/json");
+	// 	} else {
+	// 		ERROR("Directory path not found: " << dirPath);
+	// 		assignPageNotFoundContent(serverConfig);
+	// 	}
+	// } 
+
 void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerConfig& serverConfig) {
 	std::string requestURI = request.getURI();
 
-	if (requestURI == "/upload-file") {
-		INFO("File upload endpoint called for server: " << serverConfig.serverName);
-		std::string fileContent = request.getBody();
-		std::string fileName = request.getFileName();
-		if (fileName.empty()) {
-			ERROR("No file content or filename provided");
-			assignResponse(400, "Bad Request: No file content or filename provided", "text/html");
-			return;
-		}
+	std::string savePath = serverConfig.rootDirectory + request.getURI();
+	DEBUG("URI: " << request.getURI());
+	DEBUG("Saving file to: " << savePath);
+	std::ofstream outFile(savePath.c_str());
+	if (outFile) {
+		outFile.write(request.getBody().c_str(), request.getBody().size());
+		outFile.close();
 
-		std::string savePath = serverConfig.rootDirectory + "/uploads/" + fileName;
-		std::ofstream outFile(savePath.c_str());
-		if (outFile) {
-			outFile.write(request.getBody().c_str(), request.getBody().size());
-			outFile.close();
-
-			if (!outFile.fail()) {
-				INFO("File uploaded successfully: " + savePath);
-				assignResponse(200, "<html><h1>File uploaded successfully</h1></html>", "text/html");
-			} else {
-				ERROR("Failed to store file");
-				assignResponse(500, "<html><h1>Internal Server Error. Failed to write file.</h1></html>", "text/html");
-			}
+		if (!outFile.fail()) {
+			setHeader("Location", serverConfig.rootDirectory + requestURI);
+			INFO("File uploaded successfully: " + savePath);
+			assignGenericResponse(201);
 		} else {
-			ERROR("Unable to open file for writing: " + savePath);
-			assignResponse(500, "<html><h1>Internal Server Error. Unable to open file for writing</h1></html>", "text/html");
+			ERROR("Failed to store file");
+			assignGenericResponse(500);
 		}
 	} else {
-		WARNING("Unsupported POST request for URI: " + requestURI);
-		assignResponse(404, "The requested URL was not found on this server", "text/html");
+		ERROR("Unable to open file for writing: " + savePath);
+		assignGenericResponse(500);
 	}
 }
 
 void HTTPResponse::handleRequestDELETE(const HTTPRequest& request, const ServerConfig& serverConfig) {
 	std::string requestURI = request.getURI();
 
-	// if (requestURI == "/delete-file") {
-		INFO("File delete endpoint called for server: " << serverConfig.serverName);
-		// std::string fileName = request.getBody();
-		// std::string filePath = serverConfig.rootDirectory + "/uploads/" +  fileName;
-		requestURI = serverConfig.rootDirectory + requestURI; 
-		if (access(requestURI.c_str(), F_OK) != 0) {
-			ERROR("File does not exist: " + requestURI);
-			assignResponse(404, "<html><h1>File does not exist</h1></html>", "text/html");
-			return;
-		}
-		if (remove(requestURI.c_str()) == 0) {
-			SUCCESS("Deleted file: " << requestURI);
-			assignResponse(200, "<html><h1>Removed file: " + requestURI + "</h1></html>", "text/html");
-		} else {
-			ERROR("Could not delete file: " << requestURI);
-			assignResponse(500, "<html><h1>Could not remove response</h1></html>", "text/html");
-		}
-	// } else {
-	// 	WARNING("Unsupported DELETE request for URI: " + requestURI);
-	// 	assignPageNotFoundContent(serverConfig);
-	// }
+	INFO("DELETE method called for server: " << serverConfig.serverName);
+	requestURI = serverConfig.rootDirectory + requestURI; 
+	if (access(requestURI.c_str(), F_OK) != 0) {
+		ERROR("File does not exist: " + requestURI);
+		assignGenericResponse(404);
+		return;
+	}
+	if (remove(requestURI.c_str()) == 0) {
+		SUCCESS("Deleted file: " << requestURI);
+		assignGenericResponse(200);
+	} else {
+		ERROR("Could not delete file: " << requestURI);
+		assignGenericResponse(500);
+	}
 }
 
 std::string HTTPResponse::extractFolderName(const std::string& uri) {
@@ -289,30 +289,6 @@ void HTTPResponse::serveFile(const ServerConfig& serverConfig, const std::string
 	}
 }
 
-void HTTPResponse::assignPageNotFoundContent(const ServerConfig& serverConfig) {
-	std::string notFoundPagePath = serverConfig.rootDirectory + "/pages/NotFound.html";
-	std::ifstream notFoundFile(notFoundPagePath.c_str());
-	std::string notFoundContent;
-
-	if (notFoundFile) {
-		notFoundContent.assign((std::istreambuf_iterator<char>(notFoundFile)), std::istreambuf_iterator<char>());
-		notFoundFile.close();
-	} else {
-		// Fallback if the NotFound.html file does not exist in given root directory
-		notFoundContent = "<html><body><h1>404 Not Found</h1><p>The requested file was not found.</p></body></html>";
-	}
-	assignResponse(404, notFoundContent, "text/html");
-}
-
-void HTTPResponse::assignResponse(int statusCode, const std::string& body, std::string contentType) {
-	setHeader("Content-Type", contentType);
-	setHeader("Content-Length", ::toString(body.size()));
-	setHeader("Connection", "keep-alive");
-	setHeader("Keep-Alive", "timeout=60, max=50");
-	setBody(body);
-	setStatusCode(statusCode);
-}
-
 std::string HTTPResponse::determineContentType(std::string requestURI) {
 	if (endsWith(requestURI, ".css")) {
 		return "text/css";
@@ -362,6 +338,60 @@ bool HTTPResponse::isMethodAllowed(const std::string& method, const std::string&
 	}
 	// Default to false if no location configuration matches the URI
 	return false;
+}
+
+/* -------------------------------------------------------------------------- */
+/*                             Creating Responses                             */
+/* -------------------------------------------------------------------------- */
+
+void HTTPResponse::assignResponse(int statusCode, const std::string& body, std::string contentType) {
+	setHeader("Content-Type", contentType);
+	setHeader("Content-Length", ::toString(body.size()));
+	setHeader("Connection", "keep-alive");
+	setHeader("Keep-Alive", "timeout=60, max=50");
+	setBody(body);
+	setStatusCode(statusCode);
+}
+
+void HTTPResponse::assignGenericResponse(int statusCode) {
+	std::ostringstream stream;
+    std::string code = ::toString(statusCode);
+    std::string message = statusCodes.find(statusCode) != statusCodes.end() ? statusCodes.at(statusCode) : "Unknown Code In Map";
+
+	stream << "<!DOCTYPE html>"
+			<< "<html lang=\"en\">"
+			<< "<head>"
+			<< "<meta charset=\"UTF-8\">"
+			<< "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+			<< "<title>Webserv - " << code << "</title>"
+			<< "<link rel=\"stylesheet\" href=\"styles.css\">"
+			<< "<link rel=\"icon\" type=\"image/x-icon\" href=\"favicon.ico\">"
+			<< "</head>"
+			<< "<body class=\"background\">"
+			<< "<div class=\"credits\">"
+			<< "Made by "
+			<< "<a target=\"_blank\" href=\"https://github.com/RealConrad\" class=\"github-link\">Conrad Wenz</a> & "
+			<< "<a target=\"_blank\" href=\"https://github.com/kglebows\" class=\"github-link\">Konrad Glebowski</a>"
+			<< "</div>"
+			<< "<div>" << code << " - " << message << "</div>"
+			<< "</body>"
+			<< "</html>";
+	assignResponse(statusCode, stream.str(), "text/html");
+}
+
+void HTTPResponse::assignPageNotFoundContent(const ServerConfig& serverConfig) {
+	std::string notFoundPagePath = serverConfig.rootDirectory + "/pages/NotFound.html";
+	std::ifstream notFoundFile(notFoundPagePath.c_str());
+	std::string notFoundContent;
+
+	if (notFoundFile) {
+		notFoundContent.assign((std::istreambuf_iterator<char>(notFoundFile)), std::istreambuf_iterator<char>());
+		notFoundFile.close();
+	} else {
+		// Fallback if the NotFound.html file does not exist in given root directory
+		notFoundContent = "<html><body><h1>404 Not Found</h1><p>The requested file was not found.</p></body></html>";
+	}
+	assignResponse(404, notFoundContent, "text/html");
 }
 
 /* -------------------------------------------------------------------------- */

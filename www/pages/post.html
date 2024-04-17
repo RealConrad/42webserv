@@ -24,7 +24,7 @@
 
 	const formData = new FormData();
 	formData.append('file', file);
-	const url = origin + '/upload-file';
+	const url = `${window.location.origin}/uploads/${file.name}`;
 
 	try {
 		const response = await fetch(url, {
@@ -32,16 +32,12 @@
 			body: formData
 		});
 
-		if (!response.ok) {
-			throw new Error('File upload failed');
-		}
-
-		const result = await response.text();
-		console.log(result);
-		alert('File uploaded successfully!');
+		// const result = await response.text();
+		// console.log(result);
+		// alert('File uploaded successfully!');
 	} catch (error) {
 		console.error('Error:', error);
-		alert("Error: " + error.message);
+		// alert("Error: " + error.message);
 	}
   };
 
