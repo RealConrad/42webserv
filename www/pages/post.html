@@ -9,39 +9,40 @@
 
 <script>
 
-  const goBack = () => {
-    window.history.back();
-  };
+	const goBack = () => {
+		window.history.back();
+	};
 
   const uploadFile = async () => {
-    const fileInput = document.getElementById('fileUpload');
-    const file = fileInput.files[0];
+	const fileInput = document.getElementById('fileUpload');
+	const file = fileInput.files[0];
 
-    if (!file) {
-      alert('Please select a file to upload');
-      return;
-    }
+	if (!file) {
+		alert('Please select a file to upload');
+		return;
+	}
 
-    const formData = new FormData();
-    formData.append('file', file);
-    const url = origin + '/upload-file';
+	const formData = new FormData();
+	formData.append('file', file);
+	const url = origin + '/upload-file';
 
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        body: formData
-      });
+	try {
+		const response = await fetch(url, {
+			method: 'POST',
+			body: formData
+		});
 
-      if (!response.ok) {
-        throw new Error('File upload failed');
-      }
+		if (!response.ok) {
+			throw new Error('File upload failed');
+		}
 
-      const result = await response.text();
-      alert('File uploaded successfully!');
-    } catch (error) {
-      console.error('Error:', error);
-      alert("Error: " + error.message);
-    }
+		const result = await response.text();
+		console.log(result);
+		alert('File uploaded successfully!');
+	} catch (error) {
+		console.error('Error:', error);
+		alert("Error: " + error.message);
+	}
   };
 
 </script>
@@ -49,17 +50,17 @@
 <body class="background">
 
 <button onclick="goBack()" class="back-button">
-  Back
+Back
 </button>
 
 <div class="content" style="margin-bottom: 50px;">
-  Upload a file to simulate a POST request. The file will be uploaded to the server.
+Upload a file to simulate a POST request. The file will be uploaded to the server.
 </div>
 
 <div>
-    <label for="fileUpload">Choose a file:</label>
-    <input type="file" id="fileUpload" name="file">
-    <button type="button" onclick="uploadFile()">Upload File</button>
+	<label for="fileUpload">Choose a file:</label>
+	<input type="file" id="fileUpload" name="file">
+	<button type="button" onclick="uploadFile()">Upload File</button>
 </div>
 
 </body>

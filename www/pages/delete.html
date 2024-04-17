@@ -9,21 +9,71 @@
 
 <script>
 
-  const goBack = () => {
-    window.history.back();
-  };
-  
+const goBack = () => {
+	window.history.back();
+};
+
+const fetchFiles = () => {
+	fetch('/get-files')
+	.then(response => response.json())
+	.then(files => {
+		let fileList = document.getElementById('fileList');
+		if (fileList) {
+			fileList.remove();
+		}
+		fileList = document.createElement('ul');
+		fileList.id = "fileList";
+		files.forEach(file => {
+			const li = document.createElement('li');
+			li.textContent = file;
+			const deleteButton = document.createElement('button');
+			deleteButton.textContent = 'X';
+			deleteButton.onclick = () => deleteFile(file);
+			li.appendChild(deleteButton);
+			fileList.appendChild(li);
+		});
+		document.body.appendChild(fileList);
+	})
+	.catch((e) => {
+		console.log(e);
+		alert(e);
+	})
+}
+
+window.onload = () => {
+	fetchFiles();
+};
+
+function deleteFile(fileName) {
+	const url = origin + `/delete-file`
+	fetch(url, { 
+		method: 'DELETE',
+		headers: {
+			'Content-Type': 'application/json'
+		},
+		body: fileName
+	})
+	.then(() => {
+		fetchFiles();
+		alert("Deleted file: " + fileName);
+	})
+	.catch((e) => {
+		console.log(e);
+		alert(e);
+	})
+}
+
 </script>
 
 <body class="background">
 
-<div class="content">
-  This is the DELETE page. Here you can simulate a DELETE request.
-</div>
-
 <button onclick="goBack()" class="back-button">
-  Back
+	Back
 </button>
+
+<div class="content">
+	This is the DELETE page. Here you can simulate a DELETE request.
+</div>
 
 </body>
 </html>

@@ -26,10 +26,10 @@ void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& Ser
 			handleRequestPOST(request, ServerConfig);
 			break;
 		case DELETE:
-			ERROR("DELETE REQUEST NOT IMPLEMENTED YET!");
+			handleRequestDELETE(request, ServerConfig);
 			break;
 		default:
-			// TODO: SEND ERROR BACK TO CLIENT
+			assignResponse(501, "Method is not supported: " + method, "application/json");
 			throw std::runtime_error("Method '" + method + "' not implemented");
 			break;
 	}
@@ -43,10 +43,6 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 		image++;
 		INFO("/get-images endpoint called for server: " << serverConfig.serverName);
 		std::vector<std::string> images;
-		images.push_back("/images/image1.jpg");
-		images.push_back("/images/image2.jpg");
-		images.push_back("/images/image3.jpg");
-		// Get random image
 		std::string imagePath = serverConfig.rootDirectory + images[image % images.size()];
 		std::ifstream file(imagePath.c_str());
 		INFO("Serving image: " << imagePath);
@@ -57,6 +53,33 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 		} else {
 			WARNING("Image: '" << imagePath << "' not found. Serving 404 page");
 			assignPageNotFoundContent(serverConfig);
+		}
+	} else if (requestURI == "/get-files") {
+		INFO("/get-files endpoint called for server: " << serverConfig.serverName);
+		std::string dirPath = serverConfig.rootDirectory + "/uploads"; 
+		DIR *dir = opendir(dirPath.c_str());
+		if (dir) {
+			std::vector<std::string> fileNames;
+			struct dirent* entry;
+			while (true) {
+				entry = readdir(dir);
+				if (!entry)
+					break;
+				if (entry->d_name[0] == '.')
+					continue;
+				fileNames.push_back(entry->d_name);
+			}
+			std::string json = "[";
+			for (size_t i = 0; i < fileNames.size(); ++i) {
+				json += "\"" + fileNames[i] + "\"";
+				if (i < fileNames.size() - 1)
+					json += ", ";
+			}
+			json += "]";
+			assignResponse(200, json, "application/json");
+		} else {
+			ERROR("Directory path not found: " << dirPath);
+			assignResponse(404, "Directory path not found: " + dirPath, "application/json");
 		}
 	} else {
 		serveFile(serverConfig, requestURI);
@@ -84,18 +107,43 @@ void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerCon
 
 			if (!outFile.fail()) {
 				INFO("File uploaded successfully: " + savePath);
-				assignResponse(200, "File uploaded successfully", "text/html");
+				assignResponse(200, "File uploaded successfully", "application/json");
 			} else {
 				ERROR("Failed to store file");
-				assignResponse(500, "Internal Server Error. Failed to write file.", "text/html");
+				assignResponse(500, "Internal Server Error. Failed to write file.", "application/json");
 			}
 		} else {
 			ERROR("Unable to open file for writing: " + savePath);
-			assignResponse(500, "Internal Server Error. Unable to open file for writing", "text/html");
+			assignResponse(500, "Internal Server Error. Unable to open file for writing", "application/json");
 		}
 	} else {
 		WARNING("Unsupported POST request for URI: " + requestURI);
 		assignResponse(404, "The requested URL was not found on this server", "text/html");
+	}
+}
+
+void HTTPResponse::handleRequestDELETE(const HTTPRequest& request, const ServerConfig& serverConfig) {
+	std::string requestURI = request.getURI();
+
+	if (requestURI == "/delete-file") {
+		INFO("File delete endpoint called for server: " << serverConfig.serverName);
+		std::string fileName = request.getBody();
+		std::string filePath = serverConfig.rootDirectory + "/uploads/" +  fileName; 
+		if (access(filePath.c_str(), F_OK) != 0) {
+			ERROR("File does not exist: " + filePath);
+			assignResponse(404, "File does not exist", "application/json");
+			return;
+		}
+		if (remove(filePath.c_str()) == 0) {
+			SUCCESS("Deleted file: " << filePath);
+			assignResponse(200, "Removed file: " + filePath, "application/json");
+		} else {
+			ERROR("Could not delete file: " << filePath);
+			assignResponse(500, "Could not remove response", "application/json");
+		}
+	} else {
+		WARNING("Unsupported DELETE request for URI: " + requestURI);
+		assignPageNotFoundContent(serverConfig);
 	}
 }
 
@@ -242,6 +290,8 @@ std::string HTTPResponse::determineContentType(std::string requestURI) {
 		return "image/jpeg";
 	} else if (endsWith(requestURI, ".png")) {
 		return "image/png";
+	} else if (endsWith(requestURI, ".ico")) {
+		return "image/x-icon";
 	}
 	return "text/html";
 }
