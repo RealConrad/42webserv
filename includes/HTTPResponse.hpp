@@ -7,6 +7,7 @@
 #include <fstream>
 #include <cstdlib>
 #include <ctime>
+#include <cstdio>
 #include "Logger.hpp"
 #include "Structs.hpp"
 #include "Utils.hpp"

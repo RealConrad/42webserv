@@ -43,9 +43,6 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 		image++;
 		INFO("/get-images endpoint called for server: " << serverConfig.serverName);
 		std::vector<std::string> images;
-		images.push_back("/images/image1.jpg");
-		images.push_back("/images/image2.jpg");
-		images.push_back("/images/image3.jpg");
 		std::string imagePath = serverConfig.rootDirectory + images[image % images.size()];
 		std::ifstream file(imagePath.c_str());
 		INFO("Serving image: " << imagePath);
@@ -59,19 +56,31 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 		}
 	} else if (requestURI == "/get-files") {
 		INFO("/get-files endpoint called for server: " << serverConfig.serverName);
-		// TODO: READ FROM DIRECTORY AND SERVE FILES
-		std::vector<std::string> fileNames;
-		fileNames.push_back("/delete/image1.jpg");
-		fileNames.push_back("/delete/image2.jpg");
-		fileNames.push_back("/delete/image3.jpg");
-		std::string json = "[";
-		for(size_t i = 0; i < fileNames.size(); ++i) {
-			json += "\"" + fileNames[i] + "\"";
-			if (i < fileNames.size() - 1)
-				json += ", ";
+		std::string dirPath = serverConfig.rootDirectory + "/delete"; 
+		DIR *dir = opendir(dirPath.c_str());
+		if (dir) {
+			std::vector<std::string> fileNames;
+			struct dirent* entry;
+			while (true) {
+				entry = readdir(dir);
+				if (!entry)
+					break;
+				if (entry->d_name[0] == '.')
+					continue;
+				fileNames.push_back(entry->d_name);
+			}
+			std::string json = "[";
+			for (size_t i = 0; i < fileNames.size(); ++i) {
+				json += "\"" + fileNames[i] + "\"";
+				if (i < fileNames.size() - 1)
+					json += ", ";
+			}
+			json += "]";
+			assignResponse(200, json, "application/json");
+		} else {
+			ERROR("Directory path not found: " << dirPath);
+			assignResponse(404, "Directory path not found: " + dirPath, "application/json");
 		}
-    	json += "]";
-		assignResponse(200, json, "application/json");
 	} else {
 		serveFile(serverConfig, requestURI);
 	}
@@ -98,14 +107,14 @@ void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerCon
 
 			if (!outFile.fail()) {
 				INFO("File uploaded successfully: " + savePath);
-				assignResponse(200, "File uploaded successfully", "text/html");
+				assignResponse(200, "File uploaded successfully", "application/json");
 			} else {
 				ERROR("Failed to store file");
-				assignResponse(500, "Internal Server Error. Failed to write file.", "text/html");
+				assignResponse(500, "Internal Server Error. Failed to write file.", "application/json");
 			}
 		} else {
 			ERROR("Unable to open file for writing: " + savePath);
-			assignResponse(500, "Internal Server Error. Unable to open file for writing", "text/html");
+			assignResponse(500, "Internal Server Error. Unable to open file for writing", "application/json");
 		}
 	} else {
 		WARNING("Unsupported POST request for URI: " + requestURI);
@@ -119,13 +128,19 @@ void HTTPResponse::handleRequestDELETE(const HTTPRequest& request, const ServerC
 	if (requestURI == "/delete-file") {
 		INFO("File delete endpoint called for server: " << serverConfig.serverName);
 		std::string fileName = request.getBody();
-		if (access((serverConfig.rootDirectory + fileName).c_str(), F_OK) != 0) {
-			ERROR("File does not exist: " + fileName);
+		std::string filePath = serverConfig.rootDirectory + "/delete/" +  fileName; 
+		if (access(filePath.c_str(), F_OK) != 0) {
+			ERROR("File does not exist: " + filePath);
 			assignResponse(404, "File does not exist", "application/json");
 			return;
 		}
-
-		// TODO: NOT SURE HOW TO REMOVE FILE???
+		if (remove(filePath.c_str()) == 0) {
+			SUCCESS("Deleted file: " << filePath);
+			assignResponse(200, "Removed file: " + filePath, "application/json");
+		} else {
+			ERROR("Could not delete file: " << filePath);
+			assignResponse(500, "Could not remove response", "application/json");
+		}
 	} else {
 		WARNING("Unsupported DELETE request for URI: " + requestURI);
 		assignPageNotFoundContent(serverConfig);
@@ -275,6 +290,8 @@ std::string HTTPResponse::determineContentType(std::string requestURI) {
 		return "image/jpeg";
 	} else if (endsWith(requestURI, ".png")) {
 		return "image/png";
+	} else if (endsWith(requestURI, ".ico")) {
+		return "image/x-icon";
 	}
 	return "text/html";
 }
