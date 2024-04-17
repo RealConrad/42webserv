@@ -14,7 +14,7 @@ void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& ser
 	// std::string uri = request.getURI();
 	if (!isMethodAllowed(method, request.getURI(), serverConfig)) {
 		assignResponse(405, "<html><h1>405 Method not allowed</h1></html>", "text/html");
-		ERROR("Method '" << method << "' not allowed for server '" << serverConfig.serverName << "'");
+		ERROR("Method '" << method << "' not allowed for server '" << serverConfig.serverName << request.getURI() <<"'");
 		return;
 	}
 
@@ -29,7 +29,7 @@ void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& ser
 			handleRequestDELETE(request, serverConfig);
 			break;
 		default:
-			assignResponse(501, "Method is not supported: " + method, "application/json");
+			assignResponse(501, "Method is not supported: " + method, "text/html");
 			throw std::runtime_error("Method '" + method + "' not implemented");
 			break;
 	}
@@ -82,7 +82,7 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 			assignResponse(200, json, "application/json");
 		} else {
 			ERROR("Directory path not found: " << dirPath);
-			assignResponse(404, "Directory path not found: " + dirPath, "application/json");
+			assignPageNotFoundContent(serverConfig);
 		}
 	} else {
 		serveFile(serverConfig, requestURI);
@@ -110,14 +110,14 @@ void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerCon
 
 			if (!outFile.fail()) {
 				INFO("File uploaded successfully: " + savePath);
-				assignResponse(200, "File uploaded successfully", "application/json");
+				assignResponse(200, "<html><h1>File uploaded successfully</h1></html>", "text/html");
 			} else {
 				ERROR("Failed to store file");
-				assignResponse(500, "Internal Server Error. Failed to write file.", "application/json");
+				assignResponse(500, "<html><h1>Internal Server Error. Failed to write file.</h1></html>", "text/html");
 			}
 		} else {
 			ERROR("Unable to open file for writing: " + savePath);
-			assignResponse(500, "Internal Server Error. Unable to open file for writing", "application/json");
+			assignResponse(500, "<html><h1>Internal Server Error. Unable to open file for writing</h1></html>", "text/html");
 		}
 	} else {
 		WARNING("Unsupported POST request for URI: " + requestURI);
@@ -134,15 +134,15 @@ void HTTPResponse::handleRequestDELETE(const HTTPRequest& request, const ServerC
 		std::string filePath = serverConfig.rootDirectory + "/uploads/" +  fileName; 
 		if (access(filePath.c_str(), F_OK) != 0) {
 			ERROR("File does not exist: " + filePath);
-			assignResponse(404, "File does not exist", "application/json");
+			assignResponse(404, "<html><h1>File does not exist</h1></html>", "text/html");
 			return;
 		}
 		if (remove(filePath.c_str()) == 0) {
 			SUCCESS("Deleted file: " << filePath);
-			assignResponse(200, "Removed file: " + filePath, "application/json");
+			assignResponse(200, "<html><h1>Removed file: " + filePath + "</h1></html>", "text/html");
 		} else {
 			ERROR("Could not delete file: " << filePath);
-			assignResponse(500, "Could not remove response", "application/json");
+			assignResponse(500, "<html><h1>Could not remove response</h1></html>", "text/html");
 		}
 	} else {
 		WARNING("Unsupported DELETE request for URI: " + requestURI);

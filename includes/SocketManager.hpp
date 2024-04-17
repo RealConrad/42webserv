@@ -43,6 +43,10 @@ class SocketManager {
 		~SocketManager();
 
 		void setupServerSockets();
+
+		void pollin(pollfd &fd);
+		void pollout(pollfd &fd);
+		void pollerr(pollfd &fd);
 		void run();
 };
 

@@ -32,6 +32,8 @@ struct ServerConfig {
 	std::string rootDirectory;
 	bool directoryListing;
 	std::vector<LocationConfig> locations;
+	int keepAliveTimeout;
+	int sendTimeout;
 };
 
 struct HTTPConfig {
@@ -52,7 +54,15 @@ struct ClientState {
 	bool closeConnection;
 	int serverPort;
 	ServerConfig serverConfig;
-	ClientState() : totalRead(0), contentLength(0), headerEndIndex(0), headersComplete(false), closeConnection(false)  {};
+	bool assignedConfig;
+	ClientState() :
+		totalRead(0),
+		contentLength(0), 
+		headerEndIndex(0), 
+		headersComplete(false), 
+		closeConnection(false),
+		assignedConfig(false)
+	{};
 };
 
 #endif

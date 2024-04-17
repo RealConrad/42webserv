@@ -68,8 +68,6 @@ void ConfigManager::parseHttpSection(std::ifstream& configFile, std::string& lin
             if (value.empty())
                 throw std::runtime_error("Value is missing for 'server_timeout_time'");
             this->httpConfig.server_timeout_time = convertStringToInt(value);
-		} else if (key == "keepalive_timeout") {
-        	this->httpConfig.keepAliveTimeout = convertStringToInt(value);
         } else if (line == "server {") {
             ServerConfig serverConfig;
             initServerConfig(serverConfig);
@@ -128,6 +126,10 @@ void ConfigManager::handleServerDirective(std::string& line, ServerConfig& serve
         serverConfig.serverName = value;
     } else if (key == "listen") {
         serverConfig.listenPort = convertStringToInt(value);
+    } else if (key == "keepalive_timeout") {
+        serverConfig.keepAliveTimeout = convertStringToInt(value);
+    } else if (key == "send_timeout") {
+        serverConfig.sendTimeout = convertStringToInt(value);
     } else if (key == "max_body_size") {
         serverConfig.clientMaxBodySize = convertStringToInt(value);
     } else if (key == "root") {
