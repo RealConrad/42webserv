@@ -32,6 +32,8 @@ struct ServerConfig {
 	std::string rootDirectory;
 	bool directoryListing;
 	std::vector<LocationConfig> locations;
+	int keepAliveTimeout;
+	int sendTimeout;
 };
 
 struct ClientState {
@@ -53,7 +55,6 @@ struct ClientState {
 struct HTTPConfig {
 	std::vector<ServerConfig> serverConfigs;
 	int server_timeout_time;
-	int keepAliveTimeout;
 };
 
 #endif

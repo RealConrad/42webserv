@@ -128,6 +128,10 @@ void ConfigManager::handleServerDirective(std::string& line, ServerConfig& serve
         serverConfig.serverName = value;
     } else if (key == "listen") {
         serverConfig.listenPort = convertStringToInt(value);
+    } else if (key == "keepalive_timeout") {
+        serverConfig.keepAliveTimeout = convertStringToInt(value);
+    } else if (key == "send_timeout") {
+        serverConfig.sendTimeout = convertStringToInt(value);
     } else if (key == "max_body_size") {
         serverConfig.clientMaxBodySize = convertStringToInt(value);
     } else if (key == "root") {
