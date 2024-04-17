@@ -52,7 +52,6 @@ void HTTPRequest::parseBody(std::istringstream& stream) {
 			stream.read(&body[0], length);
 		}
 	}
-	DEBUG(this->body);
 }
 
 /* -------------------------------------------------------------------------- */
