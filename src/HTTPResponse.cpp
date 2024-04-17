@@ -128,26 +128,27 @@ void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerCon
 void HTTPResponse::handleRequestDELETE(const HTTPRequest& request, const ServerConfig& serverConfig) {
 	std::string requestURI = request.getURI();
 
-	if (requestURI == "/delete-file") {
+	// if (requestURI == "/delete-file") {
 		INFO("File delete endpoint called for server: " << serverConfig.serverName);
-		std::string fileName = request.getBody();
-		std::string filePath = serverConfig.rootDirectory + "/uploads/" +  fileName; 
-		if (access(filePath.c_str(), F_OK) != 0) {
-			ERROR("File does not exist: " + filePath);
+		// std::string fileName = request.getBody();
+		// std::string filePath = serverConfig.rootDirectory + "/uploads/" +  fileName;
+		requestURI = serverConfig.rootDirectory + requestURI; 
+		if (access(requestURI.c_str(), F_OK) != 0) {
+			ERROR("File does not exist: " + requestURI);
 			assignResponse(404, "<html><h1>File does not exist</h1></html>", "text/html");
 			return;
 		}
-		if (remove(filePath.c_str()) == 0) {
-			SUCCESS("Deleted file: " << filePath);
-			assignResponse(200, "<html><h1>Removed file: " + filePath + "</h1></html>", "text/html");
+		if (remove(requestURI.c_str()) == 0) {
+			SUCCESS("Deleted file: " << requestURI);
+			assignResponse(200, "<html><h1>Removed file: " + requestURI + "</h1></html>", "text/html");
 		} else {
-			ERROR("Could not delete file: " << filePath);
+			ERROR("Could not delete file: " << requestURI);
 			assignResponse(500, "<html><h1>Could not remove response</h1></html>", "text/html");
 		}
-	} else {
-		WARNING("Unsupported DELETE request for URI: " + requestURI);
-		assignPageNotFoundContent(serverConfig);
-	}
+	// } else {
+	// 	WARNING("Unsupported DELETE request for URI: " + requestURI);
+	// 	assignPageNotFoundContent(serverConfig);
+	// }
 }
 
 std::string HTTPResponse::extractFolderName(const std::string& uri) {
@@ -217,6 +218,30 @@ void HTTPResponse::serveDirectoryListing(const ServerConfig& serverConfig, const
 	}
 }
 
+void HTTPResponse::serveDeletePage(const ServerConfig& serverConfig, const std::string& uri, const std::string& fullPath) {
+	DIR* dir = opendir(fullPath.c_str());
+	if (dir != NULL) {
+		INFO("Serving Delete page of: " << fullPath);
+		struct dirent* entry;
+		std::string content = "<html><body><h1>Files of " + uri + "</h1><ul>";
+		while ((entry = readdir(dir)) != NULL) {
+			if (entry->d_name[0] == '.')
+				continue;
+			std::string name = entry->d_name;
+			std::string link = uri + (uri[uri.size() - 1] == '/' ? "" : "/") + name;
+			std::string deleteButton = "<button onclick=\"fetch(origin + '" + link + "', {method: 'DELETE'})\">Delete</button>";
+
+			content += "<li><a href='" + link + "'>" + name + "</a>" + deleteButton + "</li>";
+		}
+		content += "</ul></body></html>";
+		closedir(dir);
+		assignResponse(200, content, "text/html");
+	} else {
+		WARNING("Failed to open directory: '" << fullPath << "'. Serving 404 page");
+		assignPageNotFoundContent(serverConfig);
+	}
+}
+
 void HTTPResponse::serveRegularFile(const ServerConfig& serverConfig, const std::string& uri, const std::string& fullPath) {
 	std::ifstream file(fullPath.c_str());
 	if (!file.fail()) {
@@ -250,7 +275,9 @@ void HTTPResponse::serveFile(const ServerConfig& serverConfig, const std::string
 			return;
 		if (serveDefaultFile(uri, fullPath))
 			return;
-		if (serverConfig.directoryListing)
+		if (uri == "/uploads/")
+			serveDeletePage(serverConfig, uri, fullPath);
+		else if (serverConfig.directoryListing)
 			serveDirectoryListing(serverConfig, uri, fullPath);
 		else
 			assignPageNotFoundContent(serverConfig);

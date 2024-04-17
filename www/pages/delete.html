@@ -73,9 +73,7 @@ function deleteFile(fileName) {
 
 <body class="background">
 
-<button onclick="goBack()" class="back-button">
-	Back
-</button>
+<button onclick="fetch(origin + '/uploads/text.txt', {method: 'DELETE'})">Delete</button>
 
 <div class="content">
 	This is the DELETE page. Here you can simulate a DELETE request.
