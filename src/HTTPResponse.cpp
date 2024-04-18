@@ -104,14 +104,14 @@ void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerCon
 
         if (!outFile.fail()) {
             INFO("File uploaded successfully: " + savePath);
-            sendJsonResponse(201, savePath); // Send a 201 Created response with the file path
+            assignGenericResponse(201, savePath); // Send a 201 Created response with the file path
         } else {
             ERROR("Failed to store file");
-            sendJsonResponse(500); // Internal Server Error
+            assignGenericResponse(500); // Internal Server Error
         }
     } else {
         ERROR("Unable to open file for writing: " + savePath);
-        sendJsonResponse(500); // Internal Server Error
+        assignGenericResponse(500); // Internal Server Error
     }
 }
 
@@ -356,22 +356,6 @@ void HTTPResponse::assignResponse(int statusCode, const std::string& body, std::
 	setBody(body);
 	setStatusCode(statusCode);
 }
-
-void HTTPResponse::sendJsonResponse(int statusCode, const std::string& text) {
-    std::map<int, std::string>::const_iterator it = this->statusCodes.find(statusCode);
-    if (it != statusCodes.end()) {
-        std::ostringstream jsonStream;
-       	jsonStream << "{\"statusCode\": " << statusCode
-                   << ", \"path\": \"" << text << "\""
-                   << ", \"message\": \"" << it->second << "\"}";
-        std::string jsonResponse = jsonStream.str();
-        assignResponse(statusCode, jsonResponse, "application/json");
-    } else {
-        std::string errorResponse = "{\"statusCode\": 500, \"message\": \"Internal Server Error\"}";
-        assignResponse(500, errorResponse, "application/json");
-    }
-}
-
 
 void HTTPResponse::assignGenericResponse(int statusCode, const std::string& message) {
 	std::ostringstream stream;
