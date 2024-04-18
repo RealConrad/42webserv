@@ -78,60 +78,41 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 	}
 }
 
-//TODO: DELETE
-	// else if (requestURI == "/get-files") {
-	// 	INFO("/get-files endpoint called for server: " << serverConfig.serverName);
-	// 	std::string dirPath = serverConfig.rootDirectory + "/uploads"; 
-	// 	DIR *dir = opendir(dirPath.c_str());
-	// 	if (dir) {
-	// 		std::vector<std::string> fileNames;
-	// 		struct dirent* entry;
-	// 		while (true) {
-	// 			entry = readdir(dir);
-	// 			if (!entry)
-	// 				break;
-	// 			if (entry->d_name[0] == '.')
-	// 				continue;
-	// 			fileNames.push_back(entry->d_name);
-	// 		}
-	// 		std::string json = "[";
-	// 		for (size_t i = 0; i < fileNames.size(); ++i) {
-	// 			json += "\"" + fileNames[i] + "\"";
-	// 			if (i < fileNames.size() - 1)
-	// 				json += ", ";
-	// 		}
-	// 		json += "]";
-	// 		assignResponse(200, json, "application/json");
-	// 	} else {
-	// 		ERROR("Directory path not found: " << dirPath);
-	// 		assignPageNotFoundContent(serverConfig);
-	// 	}
-	// } 
-
 void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerConfig& serverConfig) {
-	std::string requestURI = request.getURI();
+    std::string requestURI = request.getURI();
+    std::string savePath = serverConfig.rootDirectory + requestURI + "/" + request.getFileName();
 
-	std::string savePath = serverConfig.rootDirectory + request.getURI();
-	DEBUG("URI: " << request.getURI());
-	DEBUG("Saving file to: " << savePath);
-	std::ofstream outFile(savePath.c_str());
-	if (outFile) {
-		outFile.write(request.getBody().c_str(), request.getBody().size());
-		outFile.close();
+    DEBUG("URI: " << requestURI);
+    DEBUG("Saving file to: " << savePath);
 
-		if (!outFile.fail()) {
-			setHeader("Location", serverConfig.rootDirectory + requestURI);
-			INFO("File uploaded successfully: " + savePath);
-			serveFile(serverConfig, "/");
-			// assignGenericResponse(201);
-		} else {
-			ERROR("Failed to store file");
-			assignGenericResponse(500);
-		}
-	} else {
-		ERROR("Unable to open file for writing: " + savePath);
-		assignGenericResponse(500);
-	}
+    // Check if file already exists using access
+    bool fileExists = (access(savePath.c_str(), F_OK) != -1);
+
+    if (fileExists) {
+        WARNING("File already exists: " + savePath);
+        setHeader("Location", requestURI + "/" + request.getFileName());
+        setStatusCode(302);
+        setBody("");
+        return;
+    }
+
+    // If file does not exist, proceed to create it
+    std::ofstream outFile(savePath.c_str());
+    if (outFile) {
+        outFile.write(request.getBody().c_str(), request.getBody().size());
+        outFile.close();
+
+        if (!outFile.fail()) {
+            INFO("File uploaded successfully: " + savePath);
+            sendJsonResponse(201, savePath); // Send a 201 Created response with the file path
+        } else {
+            ERROR("Failed to store file");
+            sendJsonResponse(500); // Internal Server Error
+        }
+    } else {
+        ERROR("Unable to open file for writing: " + savePath);
+        sendJsonResponse(500); // Internal Server Error
+    }
 }
 
 void HTTPResponse::handleRequestDELETE(const HTTPRequest& request, const ServerConfig& serverConfig) {
@@ -370,11 +351,27 @@ bool HTTPResponse::isMethodAllowed(const std::string& method, const std::string&
 void HTTPResponse::assignResponse(int statusCode, const std::string& body, std::string contentType) {
 	setHeader("Content-Type", contentType);
 	setHeader("Content-Length", ::toString(body.size()));
-	// setHeader("Connection", "keep-alive");
-	// setHeader("Keep-Alive", "timeout=60, max=50");
+	setHeader("Connection", "keep-alive");
+	setHeader("Keep-Alive", "timeout=60, max=50");
 	setBody(body);
 	setStatusCode(statusCode);
 }
+
+void HTTPResponse::sendJsonResponse(int statusCode, const std::string& text) {
+    std::map<int, std::string>::const_iterator it = this->statusCodes.find(statusCode);
+    if (it != statusCodes.end()) {
+        std::ostringstream jsonStream;
+       	jsonStream << "{\"statusCode\": " << statusCode
+                   << ", \"path\": \"" << text << "\""
+                   << ", \"message\": \"" << it->second << "\"}";
+        std::string jsonResponse = jsonStream.str();
+        assignResponse(statusCode, jsonResponse, "application/json");
+    } else {
+        std::string errorResponse = "{\"statusCode\": 500, \"message\": \"Internal Server Error\"}";
+        assignResponse(500, errorResponse, "application/json");
+    }
+}
+
 
 void HTTPResponse::assignGenericResponse(int statusCode, const std::string& message) {
 	std::ostringstream stream;
@@ -399,21 +396,6 @@ void HTTPResponse::assignGenericResponse(int statusCode, const std::string& mess
 			<< "</html>";
 	assignResponse(statusCode, stream.str(), "text/html");
 }
-
-// void HTTPResponse::assignPageNotFoundContent(const ServerConfig& serverConfig) {
-// 	std::string notFoundPagePath = serverConfig.rootDirectory + "/pages/NotFound.html";
-// 	std::ifstream notFoundFile(notFoundPagePath.c_str());
-// 	std::string notFoundContent;
-
-// 	if (notFoundFile) {
-// 		notFoundContent.assign((std::istreambuf_iterator<char>(notFoundFile)), std::istreambuf_iterator<char>());
-// 		notFoundFile.close();
-// 	} else {
-// 		// Fallback if the NotFound.html file does not exist in given root directory
-// 		notFoundContent = "<html><body><h1>404 Not Found</h1><p>The requested file was not found.</p></body></html>";
-// 	}
-// 	assignResponse(404, notFoundContent, "text/html");
-// }
 
 /* -------------------------------------------------------------------------- */
 /*                              Setter Functions                              */

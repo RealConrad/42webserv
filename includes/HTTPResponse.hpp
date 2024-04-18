@@ -36,7 +36,7 @@ class HTTPResponse {
 
 		void assignResponse(int statusCode, const std::string& body, std::string contentType);
 		void assignGenericResponse(int statusCode, const std::string& message = "");
-		// void assignPageNotFoundContent(const ServerConfig& serverConfig);
+		void sendJsonResponse(int statusCode, const std::string& text = "");
 
 		void serveFile(const ServerConfig& serverConfig, const std::string& uri);
 		bool serveIndex(const ServerConfig& serverConfig);
