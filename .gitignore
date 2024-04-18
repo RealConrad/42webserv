@@ -1,6 +1,5 @@
 webserv
 *.o
 objs/
-settings.json
 webserv.log
 .DS_Store

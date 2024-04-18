@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Troll Page</title>
+<link rel="stylesheet" href="../styles.css">
+<link rel="icon" type="image/x-icon" href="../favicon.ico">
+</head>
+
+<script>
+window.addEventListener('DOMContentLoaded', (event) => {
+    const audioPlayer = document.getElementById('background-audio');
+    audioPlayer.loop = true;
+    audioPlayer.play();
+});
+
+</script>
+
+<body>
+<audio id="background-audio" src="pedro.mp3" type="audio/mp3" style="display:none;">
+Your browser does not support the audio element.
+</audio>
+
+<button onclick="window.history.back()" class="back-button">
+    Back
+</button>
+<div class="header">Pedro Pedro Pedro</div>
+<div style="width:500px;height:500px;">
+    <img src="PedroPedroPedroooo.gif" alt="Troll face" style="width:100%;height:100%;">
+</div>
+</body>
+</html>
