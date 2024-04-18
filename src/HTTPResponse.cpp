@@ -82,17 +82,12 @@ void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerCon
     std::string requestURI = request.getURI();
     std::string savePath = serverConfig.rootDirectory + requestURI + "/" + request.getFileName();
 
-    DEBUG("URI: " << requestURI);
-    DEBUG("Saving file to: " << savePath);
-
-    // Check if file already exists using access
     bool fileExists = (access(savePath.c_str(), F_OK) != -1);
-
     if (fileExists) {
         WARNING("File already exists: " + savePath);
         setHeader("Location", requestURI + "/" + request.getFileName());
         setStatusCode(302);
-        setBody("");
+        setBody(""); // ???
         return;
     }
 
@@ -104,14 +99,14 @@ void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerCon
 
         if (!outFile.fail()) {
             INFO("File uploaded successfully: " + savePath);
-            assignGenericResponse(201, savePath); // Send a 201 Created response with the file path
+            assignGenericResponse(201, savePath);
         } else {
             ERROR("Failed to store file");
-            assignGenericResponse(500); // Internal Server Error
+            assignGenericResponse(500);
         }
     } else {
         ERROR("Unable to open file for writing: " + savePath);
-        assignGenericResponse(500); // Internal Server Error
+        assignGenericResponse(500);
     }
 }
 
