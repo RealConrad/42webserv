@@ -10,6 +10,15 @@ body {
   margin: 0; /* Remove default margin */
 }
 
+hr {
+    border: none;           /* Remove the default border */
+    height: 2px;            /* Set the thickness of the line */
+    background-color: white;/* Make the hr appear white */
+    width: 50%;             /* Modern UI often uses less than full-width lines */
+    margin: 20px auto;      /* Center the hr and give some vertical space */
+}
+
+
 .github-link {
   text-decoration: underline;
   color: blanchedalmond;
@@ -48,6 +57,20 @@ button {
   text-align: center;
   color: antiquewhite;
   font-size: 2em;
+}
+
+.error {
+  text-align: center;
+  font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
+  color: antiquewhite;
+  font-size: 3em;
+}
+
+.info {
+  text-align: center;
+  color: antiquewhite;
+  font-size: 1.4em;
+  font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif
 }
 
 .back-button {

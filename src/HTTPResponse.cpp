@@ -70,7 +70,8 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 			file.close();
 		} else {
 			WARNING("Image: '" << imagePath << "' not found. Serving 404 page");
-			assignPageNotFoundContent(serverConfig);
+			assignGenericResponse(404, "These Are Not the Images You Are Looking For");
+			// assignPageNotFoundContent(serverConfig);
 		}
 	} else {
 		serveFile(serverConfig, requestURI);
@@ -121,7 +122,8 @@ void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerCon
 		if (!outFile.fail()) {
 			setHeader("Location", serverConfig.rootDirectory + requestURI);
 			INFO("File uploaded successfully: " + savePath);
-			assignGenericResponse(201);
+			serveFile(serverConfig, "/");
+			// assignGenericResponse(201);
 		} else {
 			ERROR("Failed to store file");
 			assignGenericResponse(500);
@@ -196,12 +198,12 @@ bool HTTPResponse::serveDefaultFile(const std::string& uri, const std::string& f
 		return (false);
 }
 
-void HTTPResponse::serveDirectoryListing(const ServerConfig& serverConfig, const std::string& uri, const std::string& fullPath) {
+void HTTPResponse::serveDirectoryListing(const std::string& uri, const std::string& fullPath) {
 	DIR* dir = opendir(fullPath.c_str());
 	if (dir != NULL) {
 		INFO("Serving Directory Listing of: " << fullPath);
 		struct dirent* entry;
-		std::string content = "<html><body><h1>Directory Listing of " + uri + "</h1><ul>";
+		std::string content = "";
 		while ((entry = readdir(dir)) != NULL) {
 			if (entry->d_name[0] == '.')
 				continue;
@@ -209,16 +211,33 @@ void HTTPResponse::serveDirectoryListing(const ServerConfig& serverConfig, const
 			std::string link = uri + (uri[uri.size() - 1] == '/' ? "" : "/") + name;
 			content += "<li><a href='" + link + "'>" + name + "</a></li>";
 		}
-		content += "</ul></body></html>";
 		closedir(dir);
-		assignResponse(200, content, "text/html");
+		std::ostringstream stream;
+		stream << "<!DOCTYPE html>"
+			<< "<html lang=\"en\">"
+			<< "<head>"
+			<< "<meta charset=\"UTF-8\">"
+			<< "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+			<< "<title>Directory Listing of " << uri << "</title>"
+			<< "<link rel=\"stylesheet\" href=\"\\styles.css\">"
+			<< "<link rel=\"icon\" type=\"image/x-icon\" href=\"favicon.ico\">"
+			<< "</head>"
+			<< "<body class=\"background\">"
+			<< "<div class=\"error\">Directory Listing of " << uri << "</div>"
+			<< "<hr>"
+			<< "<div class=\"info\">" << content << "</div>"
+			<< "<button onclick=\"window.history.back()\" class=\"back-button\">Back</button>"
+			<< "</body>"
+			<< "</html>";
+		assignResponse(200, stream.str(), "text/html");
 	} else {
 		WARNING("Failed to open directory: '" << fullPath << "'. Serving 404 page");
-		assignPageNotFoundContent(serverConfig);
+		assignGenericResponse(404, "This should never happen! HOW?!");
+		// assignPageNotFoundContent(serverConfig);
 	}
 }
 
-void HTTPResponse::serveDeletePage(const ServerConfig& serverConfig, const std::string& uri, const std::string& fullPath) {
+void HTTPResponse::serveDeletePage(const std::string& uri, const std::string& fullPath) {
 	DIR* dir = opendir(fullPath.c_str());
 	if (dir != NULL) {
 		INFO("Serving Delete page of: " << fullPath);
@@ -238,11 +257,12 @@ void HTTPResponse::serveDeletePage(const ServerConfig& serverConfig, const std::
 		assignResponse(200, content, "text/html");
 	} else {
 		WARNING("Failed to open directory: '" << fullPath << "'. Serving 404 page");
-		assignPageNotFoundContent(serverConfig);
+		assignGenericResponse(404, "This should never happen. Yet it did. How?");
+		// assignPageNotFoundContent(serverConfig);
 	}
 }
 
-void HTTPResponse::serveRegularFile(const ServerConfig& serverConfig, const std::string& uri, const std::string& fullPath) {
+void HTTPResponse::serveRegularFile(const std::string& uri, const std::string& fullPath) {
 	std::ifstream file(fullPath.c_str());
 	if (!file.fail()) {
 		INFO("Serving file: " << fullPath);
@@ -251,7 +271,8 @@ void HTTPResponse::serveRegularFile(const ServerConfig& serverConfig, const std:
 		file.close();
 	} else {
 		WARNING("File '" << fullPath << "' not found. Serving 404 page");
-		assignPageNotFoundContent(serverConfig);
+		assignGenericResponse(404, "These Are Not the Files You Are Looking For");
+		// assignPageNotFoundContent(serverConfig);
 	}
 }
 
@@ -276,16 +297,18 @@ void HTTPResponse::serveFile(const ServerConfig& serverConfig, const std::string
 		if (serveDefaultFile(uri, fullPath))
 			return;
 		if (uri == "/uploads/")
-			serveDeletePage(serverConfig, uri, fullPath);
+			serveDeletePage(uri, fullPath);
 		else if (serverConfig.directoryListing)
-			serveDirectoryListing(serverConfig, uri, fullPath);
+			serveDirectoryListing(uri, fullPath);
 		else
-			assignPageNotFoundContent(serverConfig);
+			assignGenericResponse(405, "This Directory is over 9000!!!");
+			// assignPageNotFoundContent(serverConfig);
 	} else if (S_ISREG(path_stat.st_mode)) {
-			serveRegularFile(serverConfig, uri, fullPath);
+			serveRegularFile(uri, fullPath);
 	} else {
 		WARNING("Path '" << fullPath << "' could not be recognised! Serving 404 page");
-		assignPageNotFoundContent(serverConfig);
+		// assignPageNotFoundContent(serverConfig);
+		assignGenericResponse(404, "These Are Not the Files You Are Looking For");
 	}
 }
 
@@ -347,16 +370,16 @@ bool HTTPResponse::isMethodAllowed(const std::string& method, const std::string&
 void HTTPResponse::assignResponse(int statusCode, const std::string& body, std::string contentType) {
 	setHeader("Content-Type", contentType);
 	setHeader("Content-Length", ::toString(body.size()));
-	setHeader("Connection", "keep-alive");
-	setHeader("Keep-Alive", "timeout=60, max=50");
+	// setHeader("Connection", "keep-alive");
+	// setHeader("Keep-Alive", "timeout=60, max=50");
 	setBody(body);
 	setStatusCode(statusCode);
 }
 
-void HTTPResponse::assignGenericResponse(int statusCode) {
+void HTTPResponse::assignGenericResponse(int statusCode, const std::string& message) {
 	std::ostringstream stream;
     std::string code = ::toString(statusCode);
-    std::string message = statusCodes.find(statusCode) != statusCodes.end() ? statusCodes.at(statusCode) : "Unknown Code In Map";
+    std::string codeMessage = statusCodes.find(statusCode) != statusCodes.end() ? statusCodes.at(statusCode) : "Unknown Code In Map";
 
 	stream << "<!DOCTYPE html>"
 			<< "<html lang=\"en\">"
@@ -364,35 +387,33 @@ void HTTPResponse::assignGenericResponse(int statusCode) {
 			<< "<meta charset=\"UTF-8\">"
 			<< "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
 			<< "<title>Webserv - " << code << "</title>"
-			<< "<link rel=\"stylesheet\" href=\"styles.css\">"
+			<< "<link rel=\"stylesheet\" href=\"\\styles.css\">"
 			<< "<link rel=\"icon\" type=\"image/x-icon\" href=\"favicon.ico\">"
 			<< "</head>"
 			<< "<body class=\"background\">"
-			<< "<div class=\"credits\">"
-			<< "Made by "
-			<< "<a target=\"_blank\" href=\"https://github.com/RealConrad\" class=\"github-link\">Conrad Wenz</a> & "
-			<< "<a target=\"_blank\" href=\"https://github.com/kglebows\" class=\"github-link\">Konrad Glebowski</a>"
-			<< "</div>"
-			<< "<div>" << code << " - " << message << "</div>"
+			<< "<div class=\"error\">" << code << " - " << codeMessage << "</div>"
+			<< "<hr>"
+			<< "<div class=\"info\">" << message << "</div>"
+			<< "<button onclick=\"window.history.back()\" class=\"back-button\">Back</button>"
 			<< "</body>"
 			<< "</html>";
 	assignResponse(statusCode, stream.str(), "text/html");
 }
 
-void HTTPResponse::assignPageNotFoundContent(const ServerConfig& serverConfig) {
-	std::string notFoundPagePath = serverConfig.rootDirectory + "/pages/NotFound.html";
-	std::ifstream notFoundFile(notFoundPagePath.c_str());
-	std::string notFoundContent;
+// void HTTPResponse::assignPageNotFoundContent(const ServerConfig& serverConfig) {
+// 	std::string notFoundPagePath = serverConfig.rootDirectory + "/pages/NotFound.html";
+// 	std::ifstream notFoundFile(notFoundPagePath.c_str());
+// 	std::string notFoundContent;
 
-	if (notFoundFile) {
-		notFoundContent.assign((std::istreambuf_iterator<char>(notFoundFile)), std::istreambuf_iterator<char>());
-		notFoundFile.close();
-	} else {
-		// Fallback if the NotFound.html file does not exist in given root directory
-		notFoundContent = "<html><body><h1>404 Not Found</h1><p>The requested file was not found.</p></body></html>";
-	}
-	assignResponse(404, notFoundContent, "text/html");
-}
+// 	if (notFoundFile) {
+// 		notFoundContent.assign((std::istreambuf_iterator<char>(notFoundFile)), std::istreambuf_iterator<char>());
+// 		notFoundFile.close();
+// 	} else {
+// 		// Fallback if the NotFound.html file does not exist in given root directory
+// 		notFoundContent = "<html><body><h1>404 Not Found</h1><p>The requested file was not found.</p></body></html>";
+// 	}
+// 	assignResponse(404, notFoundContent, "text/html");
+// }
 
 /* -------------------------------------------------------------------------- */
 /*                              Setter Functions                              */

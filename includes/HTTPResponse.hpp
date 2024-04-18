@@ -35,21 +35,21 @@ class HTTPResponse {
 		void handleRequestDELETE(const HTTPRequest& request, const ServerConfig& serverConfig);
 
 		void assignResponse(int statusCode, const std::string& body, std::string contentType);
-		void assignGenericResponse(int statusCode);
-		void assignPageNotFoundContent(const ServerConfig& serverConfig);
+		void assignGenericResponse(int statusCode, const std::string& message = "");
+		// void assignPageNotFoundContent(const ServerConfig& serverConfig);
 
 		void serveFile(const ServerConfig& serverConfig, const std::string& uri);
 		bool serveIndex(const ServerConfig& serverConfig);
 		bool serveDefaultFile(const std::string& uri, const std::string& fullPath);
-		void serveDirectoryListing(const ServerConfig& serverConfig, const std::string& uri, const std::string& fullPath);
-		void serveDeletePage(const ServerConfig& serverConfig, const std::string& uri, const std::string& fullPath);
+		void serveDirectoryListing(const std::string& uri, const std::string& fullPath);
+		void serveDeletePage(const std::string& uri, const std::string& fullPath);
 
 		/* -------------------------------------------------------------------------- */
 		/*                              Helper Functions                              */
 		/* -------------------------------------------------------------------------- */
 		std::string convertToString() const;
 		std::string determineContentType(std::string requestURI);
-		void serveRegularFile(const ServerConfig& serverConfig, const std::string& uri, const std::string& fullPath);
+		void serveRegularFile(const std::string& uri, const std::string& fullPath);
 		bool isMethodAllowed(const std::string& method, const std::string& uri, const ServerConfig& serverConfig);
 		std::string extractFolderName(const std::string& uri);
 		bool cheekySlashes(const std::string& uri);
