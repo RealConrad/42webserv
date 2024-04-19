@@ -311,6 +311,8 @@ std::string HTTPResponse::determineContentType(std::string requestURI) {
 		return "image/jpeg";
 	} else if (endsWith(requestURI, ".png")) {
 		return "image/png";
+	} else if (endsWith(requestURI, ".pdf")) {
+		return "application/pdf";
 	} else if (endsWith(requestURI, ".ico")) {
 		return "image/x-icon";
 	}
