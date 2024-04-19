@@ -1,19 +1,33 @@
 #include "HTTPResponse.hpp"
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <dirent.h>
+const std::map<int, std::string> HTTPResponse::statusCodes = HTTPResponse::initializeStatusCodes();
 
 HTTPResponse::HTTPResponse() {}
 
 HTTPResponse::~HTTPResponse() {}
 
+std::map<int, std::string> HTTPResponse::initializeStatusCodes() {
+	std::map<int, std::string> statusCodes;
+	statusCodes[200] = "OK";
+	statusCodes[201] = "Created";
+	statusCodes[202] = "Accepted";
+	statusCodes[301] = "Moved Permanently";
+	statusCodes[302] = "Found";
+	statusCodes[400] = "Bad Request";
+	statusCodes[403] = "Forbidden";
+	statusCodes[404] = "Not Found";
+	statusCodes[405] = "Method Not Allowed";
+	statusCodes[408] = "Request Timeout";
+	statusCodes[500] = "Internal Server Error";
+	statusCodes[501] = "Not Implemented";
+	statusCodes[504] = "Gateway Timeout";
+	return statusCodes;
+}
+
 void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& serverConfig) {
 	std::string method = request.getMethod();
-	// std::string uri = request.getURI();
 	if (!isMethodAllowed(method, request.getURI(), serverConfig)) {
-		assignResponse(405, "<html><h1>405 Method not allowed</h1></html>", "text/html");
+		assignGenericResponse(405);
 		ERROR("Method '" << method << "' not allowed for server '" << serverConfig.serverName << request.getURI() <<"'");
 		return;
 	}
@@ -29,7 +43,7 @@ void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& ser
 			handleRequestDELETE(request, serverConfig);
 			break;
 		default:
-			assignResponse(501, "Method is not supported: " + method, "text/html");
+			assignGenericResponse(501);
 			throw std::runtime_error("Method '" + method + "' not implemented");
 			break;
 	}
@@ -55,34 +69,7 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 			file.close();
 		} else {
 			WARNING("Image: '" << imagePath << "' not found. Serving 404 page");
-			assignPageNotFoundContent(serverConfig);
-		}
-	} else if (requestURI == "/get-files") {
-		INFO("/get-files endpoint called for server: " << serverConfig.serverName);
-		std::string dirPath = serverConfig.rootDirectory + "/uploads"; 
-		DIR *dir = opendir(dirPath.c_str());
-		if (dir) {
-			std::vector<std::string> fileNames;
-			struct dirent* entry;
-			while (true) {
-				entry = readdir(dir);
-				if (!entry)
-					break;
-				if (entry->d_name[0] == '.')
-					continue;
-				fileNames.push_back(entry->d_name);
-			}
-			std::string json = "[";
-			for (size_t i = 0; i < fileNames.size(); ++i) {
-				json += "\"" + fileNames[i] + "\"";
-				if (i < fileNames.size() - 1)
-					json += ", ";
-			}
-			json += "]";
-			assignResponse(200, json, "application/json");
-		} else {
-			ERROR("Directory path not found: " << dirPath);
-			assignPageNotFoundContent(serverConfig);
+			assignGenericResponse(404, "These Are Not the Images You Are Looking For");
 		}
 	} else {
 		serveFile(serverConfig, requestURI);
@@ -90,63 +77,49 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 }
 
 void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerConfig& serverConfig) {
-	std::string requestURI = request.getURI();
+    std::string requestURI = request.getURI();
+    std::string savePath = serverConfig.rootDirectory + requestURI + request.getFileName();
 
-	if (requestURI == "/upload-file") {
-		INFO("File upload endpoint called for server: " << serverConfig.serverName);
-		std::string fileContent = request.getBody();
-		std::string fileName = request.getFileName();
-		if (fileName.empty()) {
-			ERROR("No file content or filename provided");
-			assignResponse(400, "Bad Request: No file content or filename provided", "text/html");
-			return;
-		}
-
-		std::string savePath = serverConfig.rootDirectory + "/uploads/" + fileName;
-		std::ofstream outFile(savePath.c_str());
-		if (outFile) {
-			outFile.write(request.getBody().c_str(), request.getBody().size());
-			outFile.close();
-
-			if (!outFile.fail()) {
-				INFO("File uploaded successfully: " + savePath);
-				assignResponse(200, "<html><h1>File uploaded successfully</h1></html>", "text/html");
-			} else {
-				ERROR("Failed to store file");
-				assignResponse(500, "<html><h1>Internal Server Error. Failed to write file.</h1></html>", "text/html");
-			}
-		} else {
-			ERROR("Unable to open file for writing: " + savePath);
-			assignResponse(500, "<html><h1>Internal Server Error. Unable to open file for writing</h1></html>", "text/html");
-		}
-	} else {
-		WARNING("Unsupported POST request for URI: " + requestURI);
-		assignResponse(404, "The requested URL was not found on this server", "text/html");
-	}
+    bool fileExists = (access(savePath.c_str(), F_OK) != -1);
+    if (fileExists) {
+        WARNING("File already exists: " + savePath);
+        setHeader("Location", requestURI + request.getFileName());
+        setStatusCode(302);
+        setBody("");
+        return;
+    }
+    std::ofstream outFile(savePath.c_str());
+    if (outFile) {
+        outFile.write(request.getBody().c_str(), request.getBody().size());
+        outFile.close();
+        if (!outFile.fail()) {
+            INFO("File uploaded successfully: " + savePath);
+            assignGenericResponse(201, savePath);
+        } else {
+            ERROR("Failed to store file");
+            assignGenericResponse(500);
+        }
+    } else {
+        ERROR("Unable to open file for writing: " + savePath);
+        assignGenericResponse(500);
+    }
 }
 
 void HTTPResponse::handleRequestDELETE(const HTTPRequest& request, const ServerConfig& serverConfig) {
 	std::string requestURI = request.getURI();
-
-	if (requestURI == "/delete-file") {
-		INFO("File delete endpoint called for server: " << serverConfig.serverName);
-		std::string fileName = request.getBody();
-		std::string filePath = serverConfig.rootDirectory + "/uploads/" +  fileName; 
-		if (access(filePath.c_str(), F_OK) != 0) {
-			ERROR("File does not exist: " + filePath);
-			assignResponse(404, "<html><h1>File does not exist</h1></html>", "text/html");
-			return;
-		}
-		if (remove(filePath.c_str()) == 0) {
-			SUCCESS("Deleted file: " << filePath);
-			assignResponse(200, "<html><h1>Removed file: " + filePath + "</h1></html>", "text/html");
-		} else {
-			ERROR("Could not delete file: " << filePath);
-			assignResponse(500, "<html><h1>Could not remove response</h1></html>", "text/html");
-		}
+	INFO("DELETE method called for server: " << serverConfig.serverName);
+	requestURI = serverConfig.rootDirectory + requestURI; 
+	if (access(requestURI.c_str(), F_OK) != 0) {
+		ERROR("File does not exist: " + requestURI);
+		assignGenericResponse(404);
+		return;
+	}
+	if (remove(requestURI.c_str()) == 0) {
+		SUCCESS("Deleted file: " << requestURI);
+		assignGenericResponse(200);
 	} else {
-		WARNING("Unsupported DELETE request for URI: " + requestURI);
-		assignPageNotFoundContent(serverConfig);
+		ERROR("Could not delete file: " << requestURI);
+		assignGenericResponse(500);
 	}
 }
 
@@ -195,12 +168,12 @@ bool HTTPResponse::serveDefaultFile(const std::string& uri, const std::string& f
 		return (false);
 }
 
-void HTTPResponse::serveDirectoryListing(const ServerConfig& serverConfig, const std::string& uri, const std::string& fullPath) {
+void HTTPResponse::serveDirectoryListing(const std::string& uri, const std::string& fullPath) {
 	DIR* dir = opendir(fullPath.c_str());
 	if (dir != NULL) {
 		INFO("Serving Directory Listing of: " << fullPath);
 		struct dirent* entry;
-		std::string content = "<html><body><h1>Directory Listing of " + uri + "</h1><ul>";
+		std::string content = "";
 		while ((entry = readdir(dir)) != NULL) {
 			if (entry->d_name[0] == '.')
 				continue;
@@ -208,16 +181,83 @@ void HTTPResponse::serveDirectoryListing(const ServerConfig& serverConfig, const
 			std::string link = uri + (uri[uri.size() - 1] == '/' ? "" : "/") + name;
 			content += "<li><a href='" + link + "'>" + name + "</a></li>";
 		}
-		content += "</ul></body></html>";
 		closedir(dir);
-		assignResponse(200, content, "text/html");
+		std::ostringstream stream;
+		stream << "<!DOCTYPE html>"
+			<< "<html lang=\"en\">"
+			<< "<head>"
+			<< "<meta charset=\"UTF-8\">"
+			<< "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+			<< "<title>Directory Listing of " << uri << "</title>"
+			<< "<link rel=\"stylesheet\" href=\"\\styles.css\">"
+			<< "<link rel=\"icon\" type=\"image/x-icon\" href=\"favicon.ico\">"
+			<< "</head>"
+			<< "<body class=\"background\">"
+			<< "<div class=\"error\">Directory Listing of " << uri << "</div>"
+			<< "<hr>"
+			<< "<div class=\"info\">" << content << "</div>"
+			<< "<button onclick=\"window.history.back()\" class=\"back-button\">Back</button>"
+			<< "</body>"
+			<< "</html>";
+		assignResponse(200, stream.str(), "text/html");
 	} else {
 		WARNING("Failed to open directory: '" << fullPath << "'. Serving 404 page");
-		assignPageNotFoundContent(serverConfig);
+		assignGenericResponse(404, "This should never happen! HOW?!");
 	}
 }
 
-void HTTPResponse::serveRegularFile(const ServerConfig& serverConfig, const std::string& uri, const std::string& fullPath) {
+void HTTPResponse::serveDeletePage(const std::string& uri, const std::string& fullPath) {
+	DIR* dir = opendir(fullPath.c_str());
+	if (dir != NULL) {
+		INFO("Serving Delete page of: " << fullPath);
+		struct dirent* entry;
+		std::string content = "";
+		while ((entry = readdir(dir)) != NULL) {
+			if (entry->d_name[0] == '.')
+				continue;
+			std::string name = entry->d_name;
+			std::string link = uri + (uri[uri.size() - 1] == '/' ? "" : "/") + name;
+			std::string deleteButton = "<button onclick=\""
+									"fetch('" + link + "', {method: 'DELETE'})"
+									".then(function(response) { "
+									"if (response.ok) { "
+									"window.location.reload();"
+									"} else { "
+									"alert('Delete failed with status: ' + response.status);"
+									"}"
+									"})"
+									".catch(function(error) {"
+									"alert('Network error or no response from server');"
+									"})\">"
+									"Delete</button>";
+			content += "<li><a href='" + link + "'>" + name + "</a>" + deleteButton + "</li>";
+		}
+		closedir(dir);
+		std::ostringstream stream;
+		stream << "<!DOCTYPE html>"
+			<< "<html lang=\"en\">"
+			<< "<head>"
+			<< "<meta charset=\"UTF-8\">"
+			<< "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+			<< "<title>Delete page of " << uri << "</title>"
+			<< "<link rel=\"stylesheet\" href=\"\\styles.css\">"
+			<< "<link rel=\"icon\" type=\"image/x-icon\" href=\"favicon.ico\">"
+			<< "</head>"
+			<< "<body class=\"background\">"
+			<< "<div class=\"error\">Delete page of " << uri << "</div>"
+			<< "<hr>"
+			<< "<div class=\"info\">" << content << "</div>"
+			<< "<button onclick=\"window.history.back()\" class=\"back-button\">Back</button>"
+			<< "</body>"
+			<< "</html>";
+		assignResponse(200, stream.str(), "text/html");
+	} else {
+		WARNING("Failed to open directory: '" << fullPath << "'. Serving 404 page");
+		assignGenericResponse(404, "This should never happen. Yet it did. How?");
+	}
+}
+
+void HTTPResponse::serveRegularFile(const std::string& uri, const std::string& fullPath) {
 	std::ifstream file(fullPath.c_str());
 	if (!file.fail()) {
 		INFO("Serving file: " << fullPath);
@@ -226,7 +266,7 @@ void HTTPResponse::serveRegularFile(const ServerConfig& serverConfig, const std:
 		file.close();
 	} else {
 		WARNING("File '" << fullPath << "' not found. Serving 404 page");
-		assignPageNotFoundContent(serverConfig);
+		assignGenericResponse(404, "These Are Not the Files You Are Looking For");
 	}
 }
 
@@ -250,40 +290,18 @@ void HTTPResponse::serveFile(const ServerConfig& serverConfig, const std::string
 			return;
 		if (serveDefaultFile(uri, fullPath))
 			return;
-		if (serverConfig.directoryListing)
-			serveDirectoryListing(serverConfig, uri, fullPath);
+		if (uri == "/uploads")
+			serveDeletePage(uri, fullPath);
+		else if (serverConfig.directoryListing)
+			serveDirectoryListing(uri, fullPath);
 		else
-			assignPageNotFoundContent(serverConfig);
+			assignGenericResponse(405, "This Directory is over 9000!!!");
 	} else if (S_ISREG(path_stat.st_mode)) {
-			serveRegularFile(serverConfig, uri, fullPath);
+			serveRegularFile(uri, fullPath);
 	} else {
 		WARNING("Path '" << fullPath << "' could not be recognised! Serving 404 page");
-		assignPageNotFoundContent(serverConfig);
+		assignGenericResponse(404, "These Are Not the Files You Are Looking For");
 	}
-}
-
-void HTTPResponse::assignPageNotFoundContent(const ServerConfig& serverConfig) {
-	std::string notFoundPagePath = serverConfig.rootDirectory + "/pages/NotFound.html";
-	std::ifstream notFoundFile(notFoundPagePath.c_str());
-	std::string notFoundContent;
-
-	if (notFoundFile) {
-		notFoundContent.assign((std::istreambuf_iterator<char>(notFoundFile)), std::istreambuf_iterator<char>());
-		notFoundFile.close();
-	} else {
-		// Fallback if the NotFound.html file does not exist in given root directory
-		notFoundContent = "<html><body><h1>404 Not Found</h1><p>The requested file was not found.</p></body></html>";
-	}
-	assignResponse(404, notFoundContent, "text/html");
-}
-
-void HTTPResponse::assignResponse(int statusCode, const std::string& body, std::string contentType) {
-	setHeader("Content-Type", contentType);
-	setHeader("Content-Length", ::toString(body.size()));
-	setHeader("Connection", "keep-alive");
-	setHeader("Keep-Alive", "timeout=60, max=50");
-	setBody(body);
-	setStatusCode(statusCode);
 }
 
 std::string HTTPResponse::determineContentType(std::string requestURI) {
@@ -299,7 +317,6 @@ std::string HTTPResponse::determineContentType(std::string requestURI) {
 	return "text/html";
 }
 
-// Needs to be more in depth for handling more HTTP methods, content types, and status codes
 std::string HTTPResponse::convertToString() const {
 	std::ostringstream responseStream;
 	responseStream << "HTTP/1.1 " << this->statusCode << " " << "\r\n";
@@ -312,29 +329,60 @@ std::string HTTPResponse::convertToString() const {
 
 bool HTTPResponse::isMethodAllowed(const std::string& method, const std::string& uri, const ServerConfig& serverConfig) {
 	const LocationConfig* mostSpecificMatch = NULL;
-	// Iterate over the location configurations to find the most specific matching location block
 	for (std::vector<LocationConfig>::const_iterator it = serverConfig.locations.begin(); it != serverConfig.locations.end(); ++it) {
-		if (uri.find(it->locationPath) == 0) {  // Check if the URI starts with the location path
+		if (uri.find(it->locationPath) == 0) {
 			if (!mostSpecificMatch || it->locationPath.length() > mostSpecificMatch->locationPath.length()) {
-				mostSpecificMatch = &(*it);  // Update to the more specific location match
+				mostSpecificMatch = &(*it);
 			}
 		}
 	}
-	// Check the found most specific location
 	if (mostSpecificMatch) {
 		if (mostSpecificMatch->allowedRequestTypes.empty()) {
-			return false;  // If no types are allowed, return false
+			return false;
 		}
-		// Check if the method is allowed in the most specific location
 		for (std::vector<RequestTypes>::const_iterator iter = mostSpecificMatch->allowedRequestTypes.begin(); iter != mostSpecificMatch->allowedRequestTypes.end(); ++iter) {
 			if (method == requestTypeToString(*iter)) {
 				return true;
 			}
 		}
-		return false;  // If method not found in the allowed types, return false
 	}
-	// Default to false if no location configuration matches the URI
 	return false;
+}
+
+/* -------------------------------------------------------------------------- */
+/*                             Creating Responses                             */
+/* -------------------------------------------------------------------------- */
+
+void HTTPResponse::assignResponse(int statusCode, const std::string& body, std::string contentType) {
+	setHeader("Content-Type", contentType);
+	setHeader("Content-Length", ::toString(body.size()));
+	setHeader("Connection", "keep-alive");
+	setHeader("Keep-Alive", "timeout=60, max=50");
+	setBody(body);
+	setStatusCode(statusCode);
+}
+
+void HTTPResponse::assignGenericResponse(int statusCode, const std::string& message) {
+	std::ostringstream stream;
+    std::string code = ::toString(statusCode);
+    std::string codeMessage = statusCodes.find(statusCode) != statusCodes.end() ? statusCodes.at(statusCode) : "Unknown Code In Map";
+	stream << "<!DOCTYPE html>"
+			<< "<html lang=\"en\">"
+			<< "<head>"
+			<< "<meta charset=\"UTF-8\">"
+			<< "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+			<< "<title>Webserv - " << code << "</title>"
+			<< "<link rel=\"stylesheet\" href=\"\\styles.css\">"
+			<< "<link rel=\"icon\" type=\"image/x-icon\" href=\"favicon.ico\">"
+			<< "</head>"
+			<< "<body class=\"background\">"
+			<< "<div class=\"error\">" << code << " - " << codeMessage << "</div>"
+			<< "<hr>"
+			<< "<div class=\"info\">" << message << "</div>"
+			<< "<button onclick=\"window.history.back()\" class=\"back-button\">Back</button>"
+			<< "</body>"
+			<< "</html>";
+	assignResponse(statusCode, stream.str(), "text/html");
 }
 
 /* -------------------------------------------------------------------------- */
