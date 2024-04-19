@@ -87,15 +87,11 @@ void SocketManager::run() {
 			if (this->fds[i].revents & (POLLERR | POLLHUP | POLLNVAL))
 				pollerr(fds[i]);
 			if (!isServerSocket(this->fds[i].fd)) {
-				// DEBUG("checking *" << this->fds[i].fd << "*");
 				if (this->fds[i].revents & POLLOUT)
 					pollout(fds[i]);
 				time_t now;
 				time(&now);
 				if (clientStates[fds[i].fd].assignedConfig && difftime(now, clientStates[fds[i].fd].lastActivity) > clientStates[fds[i].fd].serverConfig.keepAliveTimeout){
-					DEBUG(clientStates[fds[i].fd].lastActivity);
-					DEBUG(difftime(now, clientStates[fds[i].fd].lastActivity));
-					DEBUG(clientStates[fds[i].fd].serverConfig.keepAliveTimeout);
 					WARNING("TIMEOUT on socket *" << fds[i].fd << "*");
 					clientStates[fds[i].fd].closeConnection = true;
 				}
@@ -144,10 +140,8 @@ int SocketManager::createAndBindSocket(int port) {
 		ERROR("Failed to create socket for port: " << port);
 		return -1;
 	}
-				//delete later
-			int optval = 1;
-			setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
-			//
+	int optval = 1;
+	setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
 	if (fcntl(sockfd, F_SETFL, O_NONBLOCK | FD_CLOEXEC) < 0) {
 		closeConnection(sockfd);
 		ERROR("Failed to set to non blocking mode for socket: *" << sockfd << "*");
@@ -199,11 +193,8 @@ void SocketManager::acceptNewConnections(int server_fd) {
 bool SocketManager::readClientData(int fd) {
 	size_t size = 4096 * 4;
 	char buffer[size];
-	// DEBUG("befooooeerereee! :");
 	memset(buffer, 0, sizeof(buffer));
-	BLOCK(buffer);
 	ssize_t bytesRead = recv(fd, buffer, size, 0);
-	BLOCK(buffer);
 	if (bytesRead > 0) {
 		this->clientStates[fd].readBuffer.append(buffer, bytesRead);
 		if (!this->clientStates[fd].headersComplete) {
@@ -211,17 +202,12 @@ bool SocketManager::readClientData(int fd) {
 			if (headerEndPos != std::string::npos) {
 				this->clientStates[fd].headersComplete = true;
 				this->clientStates[fd].headerEndIndex = headerEndPos + 4;
-
-				// Find and extract Content-Length
 				size_t startPos = this->clientStates[fd].readBuffer.find("Content-Length: ");
 				if (startPos != std::string::npos) {
 					startPos += 16;
 					size_t endPos = this->clientStates[fd].readBuffer.find("\r\n", startPos);
 					std::istringstream iss(this->clientStates[fd].readBuffer.substr(startPos, endPos - startPos));
 					iss >> this->clientStates[fd].contentLength;
-
-					// Calculate already read body length
-					DEBUG("calculating total read " << this->clientStates[fd].readBuffer.length() << "-" << this->clientStates[fd].headerEndIndex);
 					this->clientStates[fd].totalRead = this->clientStates[fd].readBuffer.length() - this->clientStates[fd].headerEndIndex;
 				} else {
 					this->clientStates[fd].contentLength = 0;
@@ -230,7 +216,6 @@ bool SocketManager::readClientData(int fd) {
 		} else {
 			this->clientStates[fd].totalRead += bytesRead;
 		}
-		DEBUG("SO ThISssss Isssss: " << this->clientStates[fd].headersComplete << ". " << this->clientStates[fd].totalRead << ":" <<this->clientStates[fd].contentLength );
 		if (this->clientStates[fd].headersComplete && this->clientStates[fd].totalRead == this->clientStates[fd].contentLength) {
 			this->clientStates[fd].totalRead = 0;
 			this->clientStates[fd].headersComplete = false;
@@ -242,7 +227,6 @@ bool SocketManager::readClientData(int fd) {
 		ERROR("Failed to read from recv()");
 		this->clientStates[fd].closeConnection = true;
 	}
-	DEBUG("RETuRneniNg FaL$4eeee!");
 	return false;
 }
 
@@ -252,7 +236,6 @@ bool SocketManager::readClientData(int fd) {
 void SocketManager::processRequest(int fd) {
 	HTTPRequest request(this->clientStates[fd].readBuffer);
 	std::string keepAlive = request.getHeader("Connection");
-	DEBUG("PROCESSING REQUEEEEStTeeEeeEEe");
 	if (keepAlive == "keep-alive")
 		this->clientStates[fd].keepAlive = true;
 	else
