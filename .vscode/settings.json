@@ -49,6 +49,6 @@
         "*.tpp": "cpp"
     },
     "files.exclude": {
-        "**/.hiddenFolder": true
+        "**/.hiddenFolder": false
       }
 }

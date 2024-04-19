@@ -199,7 +199,11 @@ void SocketManager::acceptNewConnections(int server_fd) {
 bool SocketManager::readClientData(int fd) {
 	size_t size = 4096 * 4;
 	char buffer[size];
+	// DEBUG("befooooeerereee! :");
+	memset(buffer, 0, sizeof(buffer));
+	BLOCK(buffer);
 	ssize_t bytesRead = recv(fd, buffer, size, 0);
+	BLOCK(buffer);
 	if (bytesRead > 0) {
 		this->clientStates[fd].readBuffer.append(buffer, bytesRead);
 		if (!this->clientStates[fd].headersComplete) {
@@ -217,12 +221,16 @@ bool SocketManager::readClientData(int fd) {
 					iss >> this->clientStates[fd].contentLength;
 
 					// Calculate already read body length
+					DEBUG("calculating total read " << this->clientStates[fd].readBuffer.length() << "-" << this->clientStates[fd].headerEndIndex);
 					this->clientStates[fd].totalRead = this->clientStates[fd].readBuffer.length() - this->clientStates[fd].headerEndIndex;
+				} else {
+					this->clientStates[fd].contentLength = 0;
 				}
 			}
 		} else {
 			this->clientStates[fd].totalRead += bytesRead;
 		}
+		DEBUG("SO ThISssss Isssss: " << this->clientStates[fd].headersComplete << ". " << this->clientStates[fd].totalRead << ":" <<this->clientStates[fd].contentLength );
 		if (this->clientStates[fd].headersComplete && this->clientStates[fd].totalRead == this->clientStates[fd].contentLength) {
 			this->clientStates[fd].totalRead = 0;
 			this->clientStates[fd].headersComplete = false;
@@ -234,6 +242,7 @@ bool SocketManager::readClientData(int fd) {
 		ERROR("Failed to read from recv()");
 		this->clientStates[fd].closeConnection = true;
 	}
+	DEBUG("RETuRneniNg FaL$4eeee!");
 	return false;
 }
 
@@ -243,6 +252,7 @@ bool SocketManager::readClientData(int fd) {
 void SocketManager::processRequest(int fd) {
 	HTTPRequest request(this->clientStates[fd].readBuffer);
 	std::string keepAlive = request.getHeader("Connection");
+	DEBUG("PROCESSING REQUEEEEStTeeEeeEEe");
 	if (keepAlive == "keep-alive")
 		this->clientStates[fd].keepAlive = true;
 	else

@@ -27,6 +27,7 @@ std::map<int, std::string> HTTPResponse::initializeStatusCodes() {
 void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& serverConfig) {
 	std::string method = request.getMethod();
 	// std::string uri = request.getURI();
+	DEBUG("PREPARING RESPONSEEEEEEEeeee");
 	if (!isMethodAllowed(method, request.getURI(), serverConfig)) {
 		assignGenericResponse(405);
 		ERROR("Method '" << method << "' not allowed for server '" << serverConfig.serverName << request.getURI() <<"'");
