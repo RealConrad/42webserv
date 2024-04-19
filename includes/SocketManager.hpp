@@ -12,7 +12,8 @@
 #include <fstream>
 #include <streambuf>
 #include <ctime>
-#include "signal.h"
+#include <cstring>
+#include <signal.h>
 
 #include "Structs.hpp"
 #include "HTTPRequest.hpp"
