@@ -21,9 +21,11 @@ all: $(NAME)
 $(NAME): $(OBJS)
 	$(CPP) $(CXXFLAGS) $(OBJS) -o $(NAME)
 
-$(OBJ_DIR)/%.o: %.cpp
-	mkdir -p $(dir $@)
+$(OBJ_DIR)/%.o: %.cpp | $(OBJ_DIR)
 	$(CPP) $(CXXFLAGS) -c $< -o $@
+
+$(OBJ_DIR):
+	mkdir -p $@
 
 clean:
 	rm -f $(OBJS)
