@@ -169,6 +169,8 @@ void ConfigManager::parseLocationSection(std::ifstream& configFile, std::string&
                     RequestTypes type = stringToRequestType(trim(requestType));
                     locConfig.allowedRequestTypes.push_back(type);
                 } 
+            } else if (key == "redirection") {
+				locConfig.redirection = value;
             } else {
                 throw std::runtime_error("Unknown key in Location section: " + key);
             }
