@@ -51,7 +51,7 @@ class HTTPResponse {
 		void serveDirectoryListing(const std::string& uri, const std::string& fullPath);
 		void serveDeletePage(const std::string& uri, const std::string& fullPath);
 		void serveCGI(ClientState& client, std::string& fullPath);
-		void executeChild(std::string& fullPath);
+		void executeChild(const std::string& fullPath);
 		void closePipes();
 
 		/* -------------------------------------------------------------------------- */

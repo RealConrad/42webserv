@@ -68,7 +68,7 @@ struct ClientState {
 		assignedConfig(false),
 		responding(false),
 		killTheChild(false),
-		hasForked(false),
+		hasForked(false)
 	{};
 };
 
