@@ -269,16 +269,63 @@ void HTTPResponse::serveRegularFile(const std::string& uri, const std::string& f
 	}
 }
 
-void HTTPResponse::serveCGI(const std::string& uri, ClientState& client ,const std::string& fullPath){
-	(void)uri;
-	(void)client;
-	(void)fullPath;
-	//DO CGI HERE BRO!
-	
-	// if client.killTheChild == true -> kill process and then set 
-	// client.closeConnection = true with some INFO
+void HTTPResponse::serveCGI(ClientState& client, std::string& fullPath){
+	int status;
+	std::string content;
+
+	if (pipe(this->fd) == -1 || pipe(this->fd2) == -1) {
+		ERROR("Failed to create pipe()");
+		client.closeConnection = true;
+		return;
+	}
+	this->pid = fork();
+	if (this->pid == -1) {
+		ERROR("Failed to create child process");
+		closePipes();
+		client.closeConnection = true;
+	} else if (this->pid == 0) {
+		executeChild(fullPath);
+	} else {
+		char buffer[1024 * 4];
+		// close(fd[1]);
+		// fcntl(fd[0], F_SETFL, O_NONBLOCK);
+		pid_t check_pid = waitpid(this->pid, &status, WNOHANG);
+		if (check_pid == 0) {
+			return; // ???
+		} else if (check_pid > 0) {
+			if (WIFEXITED(status)) {
+				// read from child pipe here???
+				// assignResponse(200, "content??"); 
+			} else {
+				ERROR("Script did not exit normally. CHECK_PID: " << check_pid);
+				assignGenericResponse(500, "");
+			}
+		} else {
+			ERROR("Invalid CHECK_PID:: " << check_pid);
+			assignGenericResponse(500, "");
+		}
+		close(fd[0]);
+		assignResponse(200, content, "text/html");
+	}
 }
 
+void HTTPResponse::executeChild(std::string& fullPath) {
+	close(this->fd[0]);
+	dup2(this->fd[1], STDOUT_FILENO);
+	close(this->fd[1]);
+	char *argv[] = { "/usr/bin/python3", const_cast<char*>(fullPath.c_str()), NULL };
+	char *envp[] = { NULL };
+	execve(argv[0], argv, envp);
+	ERROR("execve() failed to execute: " << fullPath);
+	exit(1);
+}
+
+void HTTPResponse::closePipes() {
+	close(this->fd[0]);
+	close(this->fd[1]);
+	close(this->fd2[0]);
+	close(this->fd2[1]);
+}
 
 bool HTTPResponse::cheekySlashes(const std::string& uri) {
 	if (uri.size() == 0)
@@ -308,7 +355,7 @@ void HTTPResponse::serveFile(ClientState& client, const std::string& uri) {
 			assignGenericResponse(405, "This Directory is over 9000!!!");
 	} else if (S_ISREG(path_stat.st_mode)) {
 		if (endsWith(uri, ".py"))
-			serveCGI(uri, client, fullPath);
+			serveCGI(client, fullPath);
 		else
 			serveRegularFile(uri, fullPath);
 	} else {

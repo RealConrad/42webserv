@@ -12,10 +12,15 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <signal.h>
+#include <fcntl.h>
+
 #include "Logger.hpp"
 #include "Structs.hpp"
 #include "Utils.hpp"
 #include "HTTPRequest.hpp"
+
+# define CGI_TIMEOUT 5
 
 class HTTPResponse {
 	private:
@@ -23,6 +28,9 @@ class HTTPResponse {
 		std::map<std::string, std::string> headers;
 		static const std::map<int, std::string> statusCodes;
 		std::string body;
+		pid_t pid;
+		int fd[2];
+		int fd2[2];
 
 		static std::map<int, std::string> initializeStatusCodes();
 	public:
@@ -42,7 +50,10 @@ class HTTPResponse {
 		bool serveDefaultFile(const std::string& uri, const std::string& fullPath);
 		void serveDirectoryListing(const std::string& uri, const std::string& fullPath);
 		void serveDeletePage(const std::string& uri, const std::string& fullPath);
-		void serveCGI(const std::string& uri, ClientState& client ,const std::string& fullPath);
+		void serveCGI(ClientState& client, std::string& fullPath);
+		void executeChild(std::string& fullPath);
+		void closePipes();
+
 		/* -------------------------------------------------------------------------- */
 		/*                              Helper Functions                              */
 		/* -------------------------------------------------------------------------- */
