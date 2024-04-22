@@ -18,6 +18,7 @@ std::map<int, std::string> HTTPResponse::initializeStatusCodes() {
 	statusCodes[404] = "Not Found";
 	statusCodes[405] = "Method Not Allowed";
 	statusCodes[408] = "Request Timeout";
+	statusCodes[413] = "Payload Too Large";
 	statusCodes[500] = "Internal Server Error";
 	statusCodes[501] = "Not Implemented";
 	statusCodes[504] = "Gateway Timeout";
@@ -29,6 +30,17 @@ void HTTPResponse::prepareResponse(HTTPRequest& request, ClientState& client) {
 	if (!isMethodAllowed(method, request.getURI(), client.serverConfig)) {
 		assignGenericResponse(405);
 		ERROR("Method '" << method << "' not allowed for server '" << client.serverConfig.serverName << request.getURI() <<"'");
+		return;
+	}
+	std::string redirection = isRedirection(request.getURI(), client.serverConfig);
+	if (!redirection.empty()) {
+		WARNING("Redirecting client to: " << redirection);
+		if (redirection.substr(0, 7) != "http://" && redirection.substr(0, 8) != "https://") {
+			redirection = "http://" + redirection;
+		}
+		setHeader("Location", redirection);
+		setStatusCode(302);
+		setBody("");
 		return;
 	}
 	switch (stringToRequestType(method)) {
@@ -307,10 +319,14 @@ void HTTPResponse::serveFile(ClientState& client, const std::string& uri) {
 		else
 			assignGenericResponse(405, "This Directory is over 9000!!!");
 	} else if (S_ISREG(path_stat.st_mode)) {
-		if (endsWith(uri, ".py"))
+		if (endsWith(uri, ".py")) {
 			serveCGI(uri, client, fullPath);
-		else
-			serveRegularFile(uri, fullPath);
+		} else {
+			if (client.killTheChild)
+				client.closeConnection = true;
+			else
+				serveRegularFile(uri, fullPath);
+		}
 	} else {
 		WARNING("Path '" << fullPath << "' could not be recognised! Serving 404 page");
 		assignGenericResponse(404, "These Are Not the Files You Are Looking For");
@@ -362,6 +378,22 @@ bool HTTPResponse::isMethodAllowed(const std::string& method, const std::string&
 		}
 	}
 	return false;
+}
+
+std::string HTTPResponse::isRedirection(const std::string& uri, const ServerConfig& serverConfig) {
+	std::string redirection;
+	const LocationConfig* mostSpecificMatch = NULL;
+	for (std::vector<LocationConfig>::const_iterator it = serverConfig.locations.begin(); it != serverConfig.locations.end(); ++it) {
+		if (uri.find(it->locationPath) == 0) {
+			if (!mostSpecificMatch || it->locationPath.length() > mostSpecificMatch->locationPath.length()) {
+				mostSpecificMatch = &(*it);
+			}
+		}
+	}
+	if (mostSpecificMatch) {
+		redirection = mostSpecificMatch->redirection;
+	}
+	return redirection;
 }
 
 /* -------------------------------------------------------------------------- */

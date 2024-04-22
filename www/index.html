@@ -8,7 +8,7 @@
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 <script>
   function randomRedirect(event, originalUrl) {
-    if (Math.random() < 0.5) {
+    if (Math.random() < 0.1) {
       window.location.href = './.hiddenFolder/pedro.html';
     } else {
       window.location.href = originalUrl;
@@ -31,6 +31,7 @@
   <a onclick="randomRedirect(event, 'pages/post.html')"><button>POST</button></a>
   <a onclick="randomRedirect(event, 'uploads')"><button>DELETE</button></a>
   <a onclick="randomRedirect(event, 'pages/cgi.html')"><button>CGI</button></a>
+  <a onclick="randomRedirect(event, 'google')"><button>REDIRECTION</button></a>
 </div>
 
 </body>

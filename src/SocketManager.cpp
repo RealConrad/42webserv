@@ -46,8 +46,8 @@ void SocketManager::pollin(pollfd &fd) {
 	} else {
 		time(&clientStates[fd.fd].lastActivity);
 		clientStates[fd.fd].responding = true;
-		fd.events |= POLLOUT;
 		if (readClientData(fd.fd)) {
+			fd.events |= POLLOUT;
 			processRequest(fd.fd);
 		}
 	}
@@ -217,6 +217,16 @@ bool SocketManager::readClientData(int fd) {
 				} else {
 					this->clientStates[fd].contentLength = 0;
 				}
+				startPos = this->clientStates[fd].readBuffer.find("Host: ");
+				std::string hostName;
+				if (startPos != std::string::npos) {
+					startPos += 6;
+					size_t endPos = this->clientStates[fd].readBuffer.find("\r\n", startPos);
+					std::istringstream iss(this->clientStates[fd].readBuffer.substr(startPos, endPos - startPos));
+					iss >> hostName;
+				}
+				clientStates[fd].serverConfig = getCurrentServer(hostName, clientStates[fd].serverPort);
+				clientStates[fd].assignedConfig = true;
 			}
 		} else {
 			this->clientStates[fd].totalRead += bytesRead;
@@ -246,10 +256,15 @@ void SocketManager::processRequest(int fd) {
 	else
 		this->clientStates[fd].keepAlive = false;
 	try {
-		clientStates[fd].serverConfig = getCurrentServer(request, clientStates[fd].serverPort);
-		clientStates[fd].assignedConfig = true;
 		HTTPResponse response;
-		response.prepareResponse(request, this->clientStates[fd]);
+		if (clientStates[fd].contentLength > clientStates[fd].serverConfig.clientMaxBodySize){
+			WARNING("Body to big! serving 413!");
+			std::string payload = "Request has a body size of " + ::toString(clientStates[fd].contentLength) 
+				+ " bytes which exceeds the server body limit of " + ::toString(clientStates[fd].serverConfig.clientMaxBodySize) + " bytes!"; 
+			response.assignGenericResponse(413, payload);
+		} else {
+			response.prepareResponse(request, this->clientStates[fd]);
+		}
 		this->clientStates[fd].writeBuffer = response.convertToString();
 		this->clientStates[fd].readBuffer.clear();
 	} catch (const std::runtime_error& e) {
@@ -289,9 +304,7 @@ void SocketManager::sendResponse(pollfd &fd) {
 /*                              Helper Functions                              */
 /* -------------------------------------------------------------------------- */
 
-ServerConfig& SocketManager::getCurrentServer(const HTTPRequest& request, int port) {
-	std::string hostName = request.getHeader("Host");
-
+ServerConfig& SocketManager::getCurrentServer(std::string &hostName, int port) {
 	size_t colonPos = hostName.find(":");
 	if (colonPos != std::string::npos) {
 		hostName = hostName.substr(0, colonPos);

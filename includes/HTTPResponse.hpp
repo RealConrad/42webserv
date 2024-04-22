@@ -50,6 +50,7 @@ class HTTPResponse {
 		std::string determineContentType(std::string requestURI);
 		void serveRegularFile(const std::string& uri, const std::string& fullPath);
 		bool isMethodAllowed(const std::string& method, const std::string& uri, const ServerConfig& serverConfig);
+		std::string isRedirection(const std::string& uri, const ServerConfig& serverConfig);
 		std::string extractFolderName(const std::string& uri);
 		bool cheekySlashes(const std::string& uri);
 

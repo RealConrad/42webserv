@@ -22,12 +22,13 @@ enum SectionTypes {
 struct LocationConfig {
 	std::vector<RequestTypes> allowedRequestTypes;
 	std::string locationPath;
+	std::string redirection;
 };
 
 struct ServerConfig {
 	std::string indexFile;
 	std::string serverName;
-	int clientMaxBodySize;
+	size_t clientMaxBodySize;
 	int listenPort;
 	std::string rootDirectory;
 	bool directoryListing;

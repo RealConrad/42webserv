@@ -33,7 +33,7 @@ class SocketManager {
 		void closeConnection(int fd);
 		int createAndBindSocket(int port);
 		bool isServerSocket(int fd);
-		ServerConfig& getCurrentServer(const HTTPRequest& request, int port);
+		ServerConfig& getCurrentServer(std::string &hostName, int port);
 
 		bool portExists(std::vector<int> &ports, int port);
 		void sendResponse(pollfd &fd);
