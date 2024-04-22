@@ -29,20 +29,20 @@ class HTTPResponse {
 		HTTPResponse();
 		~HTTPResponse();
 		
-		void prepareResponse(HTTPRequest& request, const ServerConfig& ServerConfig);
-		void handleRequestGET(const HTTPRequest& request, const ServerConfig& serverConfig);
+		void prepareResponse(HTTPRequest& request, ClientState& client);
+		void handleRequestGET(const HTTPRequest& request, ClientState& client);
 		void handleRequestPOST(const HTTPRequest& request, const ServerConfig& serverConfig);
 		void handleRequestDELETE(const HTTPRequest& request, const ServerConfig& serverConfig);
 
 		void assignResponse(int statusCode, const std::string& body, std::string contentType);
 		void assignGenericResponse(int statusCode, const std::string& message = "");
 
-		void serveFile(const ServerConfig& serverConfig, const std::string& uri);
+		void serveFile(ClientState& client, const std::string& uri);
 		bool serveIndex(const ServerConfig& serverConfig);
 		bool serveDefaultFile(const std::string& uri, const std::string& fullPath);
 		void serveDirectoryListing(const std::string& uri, const std::string& fullPath);
 		void serveDeletePage(const std::string& uri, const std::string& fullPath);
-
+		void serveCGI(const std::string& uri, ClientState& client ,const std::string& fullPath);
 		/* -------------------------------------------------------------------------- */
 		/*                              Helper Functions                              */
 		/* -------------------------------------------------------------------------- */

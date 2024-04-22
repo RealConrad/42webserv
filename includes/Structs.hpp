@@ -55,13 +55,17 @@ struct ClientState {
 	int serverPort;
 	ServerConfig serverConfig;
 	bool assignedConfig;
+	bool responding;
+	bool killTheChild;
 	ClientState() :
 		totalRead(0),
 		contentLength(0), 
 		headerEndIndex(0), 
 		headersComplete(false), 
 		closeConnection(false),
-		assignedConfig(false)
+		assignedConfig(false),
+		responding(false),
+		killTheChild(false)
 	{};
 };
 

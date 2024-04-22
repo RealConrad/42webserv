@@ -45,6 +45,7 @@ void SocketManager::pollin(pollfd &fd) {
 		acceptNewConnections(fd.fd);
 	} else {
 		time(&clientStates[fd.fd].lastActivity);
+		clientStates[fd.fd].responding = true;
 		fd.events |= POLLOUT;
 		if (readClientData(fd.fd)) {
 			processRequest(fd.fd);
@@ -91,8 +92,12 @@ void SocketManager::run() {
 					pollout(fds[i]);
 				time_t now;
 				time(&now);
+				if (clientStates[fds[i].fd].assignedConfig && clientStates[fds[i].fd].responding && difftime(now, clientStates[fds[i].fd].lastActivity) > clientStates[fds[i].fd].serverConfig.sendTimeout){
+					WARNING("Send timeout on socket *" << fds[i].fd << "*");
+					clientStates[fds[i].fd].killTheChild = true;
+				}
 				if (clientStates[fds[i].fd].assignedConfig && difftime(now, clientStates[fds[i].fd].lastActivity) > clientStates[fds[i].fd].serverConfig.keepAliveTimeout){
-					WARNING("TIMEOUT on socket *" << fds[i].fd << "*");
+					WARNING("Keep-alive timeout on socket *" << fds[i].fd << "*");
 					clientStates[fds[i].fd].closeConnection = true;
 				}
 				if (clientStates[fds[i].fd].closeConnection == true){
@@ -244,7 +249,7 @@ void SocketManager::processRequest(int fd) {
 		clientStates[fd].serverConfig = getCurrentServer(request, clientStates[fd].serverPort);
 		clientStates[fd].assignedConfig = true;
 		HTTPResponse response;
-		response.prepareResponse(request, this->clientStates[fd].serverConfig);
+		response.prepareResponse(request, this->clientStates[fd]);
 		this->clientStates[fd].writeBuffer = response.convertToString();
 		this->clientStates[fd].readBuffer.clear();
 	} catch (const std::runtime_error& e) {
@@ -263,6 +268,7 @@ void SocketManager::sendResponse(pollfd &fd) {
 	if (bytesWritten > 0) {
 		this->clientStates[fd.fd].writeBuffer.erase(0, bytesWritten);
 		if (this->clientStates[fd.fd].writeBuffer.empty()) {
+			clientStates[fd.fd].responding = false;
 			fd.events = POLLIN;
 			SUCCESS("Response sent successfully on socket *" << fd.fd << "*");
 			if (this->clientStates[fd.fd].keepAlive == false) {

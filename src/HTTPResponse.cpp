@@ -24,23 +24,22 @@ std::map<int, std::string> HTTPResponse::initializeStatusCodes() {
 	return statusCodes;
 }
 
-void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& serverConfig) {
+void HTTPResponse::prepareResponse(HTTPRequest& request, ClientState& client) {
 	std::string method = request.getMethod();
-	if (!isMethodAllowed(method, request.getURI(), serverConfig)) {
+	if (!isMethodAllowed(method, request.getURI(), client.serverConfig)) {
 		assignGenericResponse(405);
-		ERROR("Method '" << method << "' not allowed for server '" << serverConfig.serverName << request.getURI() <<"'");
+		ERROR("Method '" << method << "' not allowed for server '" << client.serverConfig.serverName << request.getURI() <<"'");
 		return;
 	}
-
 	switch (stringToRequestType(method)) {
 		case GET:
-			handleRequestGET(request, serverConfig);
+			handleRequestGET(request, client);
 			break;
 		case POST:
-			handleRequestPOST(request, serverConfig);
+			handleRequestPOST(request, client.serverConfig);
 			break;
 		case DELETE:
-			handleRequestDELETE(request, serverConfig);
+			handleRequestDELETE(request, client.serverConfig);
 			break;
 		default:
 			assignGenericResponse(501);
@@ -49,18 +48,18 @@ void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& ser
 	}
 }
 
-void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConfig& serverConfig) {
+void HTTPResponse::handleRequestGET(const HTTPRequest& request, ClientState& client) {
 	std::string requestURI = request.getURI();
 	static int image = 0;
 	
 	if (requestURI == "/get-images") {
 		image++;
-		INFO("/get-images endpoint called for server: " << serverConfig.serverName);
+		INFO("/get-images endpoint called for server: " << client.serverConfig.serverName);
 		std::vector<std::string> images;
 		images.push_back("/images/image1.jpg");
 		images.push_back("/images/image2.jpg");
 		images.push_back("/images/image3.jpg");
-		std::string imagePath = serverConfig.rootDirectory + images[image % images.size()];
+		std::string imagePath = client.serverConfig.rootDirectory + images[image % images.size()];
 		std::ifstream file(imagePath.c_str());
 		INFO("Serving image: " << imagePath);
 		if (file) {
@@ -72,7 +71,7 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 			assignGenericResponse(404, "These Are Not the Images You Are Looking For");
 		}
 	} else {
-		serveFile(serverConfig, requestURI);
+		serveFile(client, requestURI);
 	}
 }
 
@@ -270,6 +269,17 @@ void HTTPResponse::serveRegularFile(const std::string& uri, const std::string& f
 	}
 }
 
+void HTTPResponse::serveCGI(const std::string& uri, ClientState& client ,const std::string& fullPath){
+	(void)uri;
+	(void)client;
+	(void)fullPath;
+	//DO CGI HERE BRO!
+	
+	// if client.killTheChild == true -> kill process and then set 
+	// client.closeConnection = true with some INFO
+}
+
+
 bool HTTPResponse::cheekySlashes(const std::string& uri) {
 	if (uri.size() == 0)
 		return (true);
@@ -281,22 +291,25 @@ bool HTTPResponse::cheekySlashes(const std::string& uri) {
 	return (true);
 }
 
-void HTTPResponse::serveFile(const ServerConfig& serverConfig, const std::string& uri) {
-	std::string fullPath = serverConfig.rootDirectory + uri;
+void HTTPResponse::serveFile(ClientState& client, const std::string& uri) {
+	std::string fullPath = client.serverConfig.rootDirectory + uri;
 	struct stat path_stat;
 	stat(fullPath.c_str(), &path_stat);
 	if (S_ISDIR(path_stat.st_mode)) {
-		if (cheekySlashes(uri) && serveIndex(serverConfig))
+		if (cheekySlashes(uri) && serveIndex(client.serverConfig))
 			return;
 		if (serveDefaultFile(uri, fullPath))
 			return;
 		if (uri == "/uploads")
 			serveDeletePage(uri, fullPath);
-		else if (serverConfig.directoryListing)
+		else if (client.serverConfig.directoryListing)
 			serveDirectoryListing(uri, fullPath);
 		else
 			assignGenericResponse(405, "This Directory is over 9000!!!");
 	} else if (S_ISREG(path_stat.st_mode)) {
+		if (endsWith(uri, ".py"))
+			serveCGI(uri, client, fullPath);
+		else
 			serveRegularFile(uri, fullPath);
 	} else {
 		WARNING("Path '" << fullPath << "' could not be recognised! Serving 404 page");
