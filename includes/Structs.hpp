@@ -58,6 +58,7 @@ struct ClientState {
 	bool assignedConfig;
 	bool responding;
 	bool killTheChild;
+	bool hasForked;
 	ClientState() :
 		totalRead(0),
 		contentLength(0), 
@@ -66,7 +67,8 @@ struct ClientState {
 		closeConnection(false),
 		assignedConfig(false),
 		responding(false),
-		killTheChild(false)
+		killTheChild(false),
+		hasForked(false),
 	{};
 };
 

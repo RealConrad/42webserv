@@ -290,13 +290,15 @@ void HTTPResponse::serveCGI(ClientState& client, std::string& fullPath){
 		client.closeConnection = true;
 		return;
 	}
-	this->pid = fork();
-	if (this->pid == -1) {
-		ERROR("Failed to create child process");
-		closePipes();
-		client.closeConnection = true;
-	} else if (this->pid == 0) {
-		executeChild(fullPath);
+	if (!client.hasForked) {
+		client.hasForked = true;
+		this->pid = fork();
+		if (this->pid == -1) {
+			ERROR("Failed to create child process");
+			closePipes();
+			client.closeConnection = true;
+		} else if (this->pid == 0) 
+			executeChild(fullPath); 
 	} else {
 		char buffer[1024 * 4];
 		// close(fd[1]);
@@ -317,7 +319,6 @@ void HTTPResponse::serveCGI(ClientState& client, std::string& fullPath){
 			assignGenericResponse(500, "");
 		}
 		close(fd[0]);
-		assignResponse(200, content, "text/html");
 	}
 }
 
