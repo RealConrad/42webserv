@@ -8,12 +8,12 @@
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 <script>
   function randomRedirect(event, originalUrl) {
-    if (Math.random() < 0.99999) {
-      window.location.href = './.hiddenFolder/pedro.html';
-    } else {
-      window.location.href = originalUrl;
-    }
-    event.preventDefault();
+	if (Math.random() < 0.99999) {
+		window.location.href = './.hiddenFolder/pedro.html';
+	} else {
+		window.location.href = originalUrl;
+	}
+	event.preventDefault();
   }
 </script>
 </head>
@@ -21,17 +21,17 @@
 
 <div class="header">*WEBSERV*</div>
 <div class="credits">
-  Made by 
-  <a target="_blank" href="https://github.com/RealConrad" class="github-link">Conrad Wenz</a> & 
-  <a target="_blank" href="https://github.com/kglebows" class="github-link">Konrad Glebowski</a>
+	Made by 
+	<a target="_blank" href="https://github.com/RealConrad" class="github-link">Conrad Wenz</a> & 
+	<a target="_blank" href="https://github.com/kglebows" class="github-link">Konrad Glebowski</a>
 </div>
 
 <div class="buttons">
-  <a onclick="randomRedirect(event, 'pages/get.html')"><button>GET</button></a>
-  <a onclick="randomRedirect(event, 'pages/post.html')"><button>POST</button></a>
-  <a onclick="randomRedirect(event, 'uploads')"><button>DELETE</button></a>
-  <a onclick="randomRedirect(event, 'pages/cgi.html')"><button>CGI</button></a>
-  <a onclick="randomRedirect(event, 'google')"><button>REDIRECTION</button></a>
+	<a onclick="randomRedirect(event, 'pages/get.html')"><button>GET</button></a>
+	<a onclick="randomRedirect(event, 'pages/post.html')"><button>POST</button></a>
+	<a onclick="randomRedirect(event, 'uploads')"><button>DELETE</button></a>
+	<a onclick="randomRedirect(event, 'pages/cgi.html')"><button>CGI</button></a>
+	<a onclick="randomRedirect(event, 'google')"><button>REDIRECTION</button></a>
 </div>
 
 </body>

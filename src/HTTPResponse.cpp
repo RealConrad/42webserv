@@ -92,32 +92,32 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, ClientState& cli
 /* -------------------------------------------------------------------------- */
 
 void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerConfig& serverConfig) {
-    std::string requestURI = request.getURI();
-    std::string savePath = serverConfig.rootDirectory + requestURI + request.getFileName();
+	std::string requestURI = request.getURI();
+	std::string savePath = serverConfig.rootDirectory + requestURI + request.getFileName();
 
-    bool fileExists = (access(savePath.c_str(), F_OK) != -1);
-    if (fileExists) {
-        WARNING("File already exists: " + savePath);
-        setHeader("Location", requestURI + request.getFileName());
-        setStatusCode(302);
-        setBody("");
-        return;
-    }
-    std::ofstream outFile(savePath.c_str());
-    if (outFile) {
-        outFile.write(request.getBody().c_str(), request.getBody().size());
-        outFile.close();
-        if (!outFile.fail()) {
-            INFO("File uploaded successfully: " + savePath);
-            assignGenericResponse(201, savePath);
-        } else {
-            ERROR("Failed to store file");
-            assignGenericResponse(500);
-        }
-    } else {
-        ERROR("Unable to open file for writing: " + savePath);
-        assignGenericResponse(500);
-    }
+	bool fileExists = (access(savePath.c_str(), F_OK) != -1);
+	if (fileExists) {
+		WARNING("File already exists: " + savePath);
+		setHeader("Location", requestURI + request.getFileName());
+		setStatusCode(302);
+		setBody("");
+		return;
+	}
+	std::ofstream outFile(savePath.c_str());
+	if (outFile) {
+		outFile.write(request.getBody().c_str(), request.getBody().size());
+		outFile.close();
+		if (!outFile.fail()) {
+			INFO("File uploaded successfully: " + savePath);
+			assignGenericResponse(201, savePath);
+		} else {
+			ERROR("Failed to store file");
+			assignGenericResponse(500);
+		}
+	} else {
+		ERROR("Unable to open file for writing: " + savePath);
+		assignGenericResponse(500);
+	}
 }
 
 /* -------------------------------------------------------------------------- */
@@ -405,8 +405,8 @@ void HTTPResponse::assignResponse(int statusCode, const std::string& body, std::
 
 void HTTPResponse::assignGenericResponse(int statusCode, const std::string& message) {
 	std::ostringstream stream;
-    std::string code = ::toString(statusCode);
-    std::string codeMessage = statusCodes.find(statusCode) != statusCodes.end() ? statusCodes.at(statusCode) : "Unknown Code In Map";
+	std::string code = ::toString(statusCode);
+	std::string codeMessage = statusCodes.find(statusCode) != statusCodes.end() ? statusCodes.at(statusCode) : "Unknown Code In Map";
 	stream << "<!DOCTYPE html>"
 			<< "<html lang=\"en\">"
 			<< "<head>"
