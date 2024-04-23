@@ -30,17 +30,24 @@
 <div class="content">
 	This is the CGI page. Here you can simulate a CGI request.
 </div>
+
 <div class="buttons">
 	<a onclick="randomRedirect(event, '../cgi/hello.py')"><button>CGI</button></a>
-	<a onclick="randomRedirect(event, '../cgi/infinite_hello.py')"><button>BAD CGI</button></a>
-	<form action="cgi/script.py" method="get">
-        <label for="get_param">GET Parameter:</label>
-        <input type="text" id="get_param" name="get_param">
+	<a onclick="randomRedirect(event, '../cgi/infinite_hello.py')"><button>INFINITE CGI</button></a>
+	<a onclick="randomRedirect(event, '../cgi/invalid.py')"><button>INVALID CGI</button></a>
+	<a onclick="randomRedirect(event, '../cgi/missing.py')"><button>MISSING CGI</button></a>
+	<form action="../cgi/custom_hello.py" method="get">
+		<label for="param">Param</label>
+        <input id="param" required type="text" name="param">
+		<label for="nbr">Number</label>
+        <input id="nbr" required type="number" name="num">
         <button type="submit">Submit GET</button>
     </form>
-    <form action="cgi/post.py" method="post">
-        <label for="post_param">POST Parameter:</label>
-        <input type="text" id="post_param" name="post_param">
+    <form action="../cgi/custom_hello.py" method="post">
+		<label for="param">Param</label>
+		<input id="param" required type="text" name="param">
+		<label for="nbr">Number</label>
+		<input id="nbr" required type="number" name="num">
         <button type="submit">Submit POST</button>
     </form>
 </div>
