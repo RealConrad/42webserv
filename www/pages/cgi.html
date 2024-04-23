@@ -13,14 +13,36 @@
     window.history.back();
   };
   
-</script>
 
+	function randomRedirect(event, originalUrl) {
+	  if (Math.random() < 0.1) {
+		window.location.href = '.././.hiddenFolder/pedro.html';
+	  } else {
+		window.location.href = originalUrl;
+	  }
+	  event.preventDefault();
+	}
+  </script>
 <body class="background">
 <button onclick="goBack()" class="back-button">
 	Back
 </button>
 <div class="content">
 	This is the CGI page. Here you can simulate a CGI request.
+</div>
+<div class="buttons">
+	<a onclick="randomRedirect(event, '../cgi/hello.py')"><button>CGI</button></a>
+	<a onclick="randomRedirect(event, '../cgi/infinite_hello.py')"><button>BAD CGI</button></a>
+	<form action="cgi/script.py" method="get">
+        <label for="get_param">GET Parameter:</label>
+        <input type="text" id="get_param" name="get_param">
+        <button type="submit">Submit GET</button>
+    </form>
+    <form action="cgi/post.py" method="post">
+        <label for="post_param">POST Parameter:</label>
+        <input type="text" id="post_param" name="post_param">
+        <button type="submit">Submit POST</button>
+    </form>
 </div>
 
 
