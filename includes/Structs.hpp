@@ -65,7 +65,7 @@ struct ClientState {
 	pid_t childPid;
 	int childFd[2];
 	std::string method;
-	std::string bodyCgi;
+	std::string body;
 	ClientState() :
 		totalRead(0),
 		contentLength(0), 

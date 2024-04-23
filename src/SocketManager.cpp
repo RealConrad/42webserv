@@ -256,31 +256,31 @@ bool SocketManager::readClientData(int fd) {
 
 std::string SocketManager::handleCGI(ClientState& client, std::string& fullPath) {
 	std::string output;
-    if (!client.hasForked) {
-        INFO("Starting CGI - Forking process");
-        if (pipe(client.childFd) == -1) {
-            ERROR("Failed to create pipe");
-            client.closeConnection = true;
-            return ("Internal server error");
-        }
-        client.childPid = fork();
-        if (client.childPid == -1) {
-            ERROR("Failed to fork");
-            close(client.childFd[0]);
+	if (!client.hasForked) {
+		INFO("Starting CGI - Forking process");
+		if (pipe(client.childFd) == -1) {
+			ERROR("Failed to create pipe");
+			client.closeConnection = true;
+			return ("Internal server error");
+		}
+		client.childPid = fork();
+		if (client.childPid == -1) {
+			ERROR("Failed to fork");
+			close(client.childFd[0]);
 			close(client.childFd[1]);
-            client.closeConnection = true;
-            return ("Internal server error");
-        } else if (client.childPid == 0) {
-            executeChild(client, fullPath);
-            return ("Internal server error");
-        } else {
-            close(client.childFd[1]);  // Close the write end of the pipe in the parent
-            client.hasForked = true;
-        	return checkAndHandleChildProcess(client);
-        }
-    } else {
+			client.closeConnection = true;
+			return ("Internal server error");
+		} else if (client.childPid == 0) {
+			executeChild(client, fullPath);
+			return ("Internal server error");
+		} else {
+			close(client.childFd[1]);  // Close the write end of the pipe in the parent
+			client.hasForked = true;
+			return checkAndHandleChildProcess(client);
+		}
+	} else {
 		return checkAndHandleChildProcess(client);
-    }
+	}
 }
 
 void SocketManager::processCGI(std::string stringCode, int fd) {
@@ -302,11 +302,11 @@ void SocketManager::processCGI(std::string stringCode, int fd) {
 }
 
 std::string SocketManager::checkAndHandleChildProcess(ClientState& client) {
-    int status;
-    std::string output;
-    char buffer[1024];
-    int bytesRead;
-    time_t now;
+	int status;
+	std::string output;
+	char buffer[1024];
+	int bytesRead;
+	time_t now;
 	time(&now);
 	// DEBUG("checking the child..."<< client.childPid << " at " << now);
 	if (difftime(now, client.lastActivity) > client.serverConfig.sendTimeout) {
@@ -348,52 +348,81 @@ std::string SocketManager::checkAndHandleChildProcess(ClientState& client) {
 }
 
 void SocketManager::executeChild(ClientState& client, std::string& fullPath) {
-    char fullPathWritable[1024]; // Ensure the fullPath is within a reasonable limit
-    std::strcpy(fullPathWritable, fullPath.c_str());
-	// we need to divide the full path into runPath and PATH_INFO
+	char scriptPath[1024] = {0};
+	std::string valuePart;
 
-    close(client.childFd[0]);
-    dup2(client.childFd[1], STDOUT_FILENO);
-    close(client.childFd[1]);
-
-    const char* argv[] = {"/usr/bin/python3", fullPathWritable, NULL};
-
-	if (client.method == "GET"){
-    	const char* envp[] = {NULL}; // PATH_INFO
+	size_t queryStringPos = fullPath.find("?");
+	if (queryStringPos != std::string::npos) {
+		std::strcpy(scriptPath, fullPath.substr(0, queryStringPos).c_str());
+		valuePart = fullPath.substr(queryStringPos + 1);
 	} else {
-    	const char* envp[] = {NULL}; // client.bodyCgi 
+		std::strcpy(scriptPath, fullPath.c_str());
 	}
 
-    execve(argv[0], const_cast<char* const*>(argv), const_cast<char* const*>(envp));
+	if (client.method == "POST" && valuePart.empty()) {
+		valuePart = client.body;
+	}
 
-    ERROR("execve failed: " << fullPath);
-    exit(1); // If execve returns, it's an error
+	// Environment variable setup
+	std::vector<const char*> envp;
+	std::string envQuery = "QUERY_STRING=" + valuePart;
+	std::string envRequestMethod = "REQUEST_METHOD=" + client.method;
+	std::string envContentLength = "CONTENT_LENGTH=" + ::toString(client.contentLength);
+
+	envp.push_back(envQuery.c_str());
+	envp.push_back(envRequestMethod.c_str());
+	envp.push_back("CONTENT_TYPE=text/html");
+	envp.push_back(NULL);
+
+
+	DEBUG("CONTENT_LENGTH=" + ::toString(client.contentLength));
+	DEBUG("QUERY_STRING=" + valuePart);
+	DEBUG("REQUEST_METHOD=" + client.method);
+	DEBUG("PATH: " + std::string(scriptPath));
+
+	close(client.childFd[0]);
+	dup2(client.childFd[1], STDOUT_FILENO);
+	close(client.childFd[1]);
+
+	const char* argv[] = {"/usr/bin/python3", scriptPath, NULL};
+	execve(argv[0], const_cast<char* const*>(argv), const_cast<char* const*>(envp.data()));
+
+	ERROR("execve failed: " + fullPath);
+	exit(1);
 }
 
 
-
 /* ---------------------------- Handle Responses ---------------------------- */
-
-
 
 void SocketManager::processRequest(int fd) {
 	HTTPRequest request(this->clientStates[fd].readBuffer);
 	BLOCK(this->clientStates[fd].readBuffer);
 	std::string stringCode = "go";
 	std::string keepAlive = request.getHeader("Connection");
+	std::string uri = request.getURI();
+	
+	size_t queryPos = uri.find('?');
+	if (queryPos != std::string::npos) {
+		uri = uri.substr(0, queryPos);
+	}
+
+	size_t dotPos = uri.find_last_of('.');
+	std::string extension;
+	if (dotPos != std::string::npos) {
+		extension = uri.substr(dotPos);
+	}
+
 	if (keepAlive == "keep-alive")
 		this->clientStates[fd].keepAlive = true;
 	else
 		this->clientStates[fd].keepAlive = false;
 	if (clientStates[fd].contentLength > clientStates[fd].serverConfig.clientMaxBodySize){
 		stringCode = "413";
-	} else if (endsWith(request.getURI(), ".py")) { /// Modify to find .py or .py?whatever 
+	} else if (extension == ".py") { 
 		std::string fullPath = clientStates[fd].serverConfig.rootDirectory + request.getURI();
 		clientStates[fd].method = request.getMethod();
-		if (clientStates[fd].method == "POST"){
-			clientStates[fd].bodyCgi = request.getBody();
-		}
-		if (clientStates[fd].method == "GET" || clientStates[fd].method == "POST")
+		clientStates[fd].body = request.getBody();
+		if (request.getMethod() == "GET" || request.getMethod() == "POST")
 			stringCode = handleCGI(clientStates[fd], fullPath);
 		else
 			stringCode = "403";
