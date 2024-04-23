@@ -18,29 +18,40 @@ std::map<int, std::string> HTTPResponse::initializeStatusCodes() {
 	statusCodes[404] = "Not Found";
 	statusCodes[405] = "Method Not Allowed";
 	statusCodes[408] = "Request Timeout";
+	statusCodes[413] = "Payload Too Large";
 	statusCodes[500] = "Internal Server Error";
 	statusCodes[501] = "Not Implemented";
 	statusCodes[504] = "Gateway Timeout";
 	return statusCodes;
 }
 
-void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& serverConfig) {
+void HTTPResponse::prepareResponse(HTTPRequest& request, ClientState& client) {
 	std::string method = request.getMethod();
-	if (!isMethodAllowed(method, request.getURI(), serverConfig)) {
+	if (!isMethodAllowed(method, request.getURI(), client.serverConfig)) {
 		assignGenericResponse(405);
-		ERROR("Method '" << method << "' not allowed for server '" << serverConfig.serverName << request.getURI() <<"'");
+		ERROR("Method '" << method << "' not allowed for server '" << client.serverConfig.serverName << request.getURI() <<"'");
 		return;
 	}
-
+	std::string redirection = isRedirection(request.getURI(), client.serverConfig);
+	if (!redirection.empty()) {
+		WARNING("Redirecting client to: " << redirection);
+		if (redirection.substr(0, 7) != "http://" && redirection.substr(0, 8) != "https://") {
+			redirection = "http://" + redirection;
+		}
+		setHeader("Location", redirection);
+		setStatusCode(302);
+		setBody("");
+		return;
+	}
 	switch (stringToRequestType(method)) {
 		case GET:
-			handleRequestGET(request, serverConfig);
+			handleRequestGET(request, client);
 			break;
 		case POST:
-			handleRequestPOST(request, serverConfig);
+			handleRequestPOST(request, client.serverConfig);
 			break;
 		case DELETE:
-			handleRequestDELETE(request, serverConfig);
+			handleRequestDELETE(request, client.serverConfig);
 			break;
 		default:
 			assignGenericResponse(501);
@@ -49,18 +60,18 @@ void HTTPResponse::prepareResponse(HTTPRequest& request, const ServerConfig& ser
 	}
 }
 
-void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConfig& serverConfig) {
+void HTTPResponse::handleRequestGET(const HTTPRequest& request, ClientState& client) {
 	std::string requestURI = request.getURI();
 	static int image = 0;
 	
 	if (requestURI == "/get-images") {
 		image++;
-		INFO("/get-images endpoint called for server: " << serverConfig.serverName);
+		INFO("/get-images endpoint called for server: " << client.serverConfig.serverName);
 		std::vector<std::string> images;
 		images.push_back("/images/image1.jpg");
 		images.push_back("/images/image2.jpg");
 		images.push_back("/images/image3.jpg");
-		std::string imagePath = serverConfig.rootDirectory + images[image % images.size()];
+		std::string imagePath = client.serverConfig.rootDirectory + images[image % images.size()];
 		std::ifstream file(imagePath.c_str());
 		INFO("Serving image: " << imagePath);
 		if (file) {
@@ -72,7 +83,7 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, const ServerConf
 			assignGenericResponse(404, "These Are Not the Images You Are Looking For");
 		}
 	} else {
-		serveFile(serverConfig, requestURI);
+		serveFile(client, requestURI);
 	}
 }
 
@@ -281,23 +292,30 @@ bool HTTPResponse::cheekySlashes(const std::string& uri) {
 	return (true);
 }
 
-void HTTPResponse::serveFile(const ServerConfig& serverConfig, const std::string& uri) {
-	std::string fullPath = serverConfig.rootDirectory + uri;
+void HTTPResponse::serveFile(ClientState& client, const std::string& uri) {
+	std::string fullPath = client.serverConfig.rootDirectory + uri;
 	struct stat path_stat;
 	stat(fullPath.c_str(), &path_stat);
 	if (S_ISDIR(path_stat.st_mode)) {
-		if (cheekySlashes(uri) && serveIndex(serverConfig))
+		if (cheekySlashes(uri) && serveIndex(client.serverConfig))
 			return;
 		if (serveDefaultFile(uri, fullPath))
 			return;
 		if (uri == "/uploads")
 			serveDeletePage(uri, fullPath);
-		else if (serverConfig.directoryListing)
+		else if (client.serverConfig.directoryListing)
 			serveDirectoryListing(uri, fullPath);
 		else
 			assignGenericResponse(405, "This Directory is over 9000!!!");
 	} else if (S_ISREG(path_stat.st_mode)) {
-			serveRegularFile(uri, fullPath);
+		// if (endsWith(uri, ".py")) {
+		// 	serveCGI(client, fullPath);
+		// } else {
+			// if (client.killTheChild)
+			// 	client.closeConnection = true;
+			// else
+				serveRegularFile(uri, fullPath);
+		// }
 	} else {
 		WARNING("Path '" << fullPath << "' could not be recognised! Serving 404 page");
 		assignGenericResponse(404, "These Are Not the Files You Are Looking For");
@@ -349,6 +367,22 @@ bool HTTPResponse::isMethodAllowed(const std::string& method, const std::string&
 		}
 	}
 	return false;
+}
+
+std::string HTTPResponse::isRedirection(const std::string& uri, const ServerConfig& serverConfig) {
+	std::string redirection;
+	const LocationConfig* mostSpecificMatch = NULL;
+	for (std::vector<LocationConfig>::const_iterator it = serverConfig.locations.begin(); it != serverConfig.locations.end(); ++it) {
+		if (uri.find(it->locationPath) == 0) {
+			if (!mostSpecificMatch || it->locationPath.length() > mostSpecificMatch->locationPath.length()) {
+				mostSpecificMatch = &(*it);
+			}
+		}
+	}
+	if (mostSpecificMatch) {
+		redirection = mostSpecificMatch->redirection;
+	}
+	return redirection;
 }
 
 /* -------------------------------------------------------------------------- */

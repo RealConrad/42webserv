@@ -8,22 +8,46 @@
 </head>
 
 <script>
+	const goBack = () => {
+		window.history.back();
+	};
 
-  const goBack = () => {
-    window.history.back();
-  };
-  
+	const randomRedirect = (event, originalUrl) => {
+		window.location.href = originalUrl;
+		event.preventDefault();
+	}
+
 </script>
-
 <body class="background">
-
+<button onclick="goBack()" class="back-button">
+	Back
+</button>
 <div class="content">
-  This is the CGI page. Here you can simulate a CGI request.
+	This is the CGI page. Here you can simulate a CGI request.
 </div>
 
-<button onclick="goBack()" class="back-button">
-  Back
-</button>
+<div style="padding-top: 10px;">
+	<a onclick="randomRedirect(event, '../cgi/hello.py')"><button>CGI</button></a>
+	<a onclick="randomRedirect(event, '../cgi/infinite_hello.py')"><button>INFINITE CGI</button></a>
+	<a onclick="randomRedirect(event, '../cgi/invalid.py')"><button>INVALID CGI</button></a>
+	<a onclick="randomRedirect(event, '../cgi/missing.py')"><button>MISSING CGI</button></a>
+	<div style="padding-top: 40px;"></div>
+	<form action="../cgi/custom_hello.py" method="get">
+		<label for="param">Param</label>
+        <input id="param" required type="text" name="param">
+		<label for="nbr">Number</label>
+        <input id="nbr" required type="number" min="1" name="num">
+        <button type="submit">GET CGI</button>
+    </form>
+    <form style="padding-top: 20px;" action="../cgi/custom_hello.py" method="post">
+		<label for="param">Param</label>
+		<input id="param" required type="text" name="param">
+		<label for="nbr">Number</label>
+		<input id="nbr" required type="number" min="1" name="num">
+        <button type="submit">POST CGI</button>
+    </form>
+</div>
+
 
 </body>
 </html>

@@ -6,6 +6,9 @@
 #include <string>
 #include <ctime>
 
+class HTTPRequest;
+class HTTPResponse;
+
 enum RequestTypes {
 	GET,
 	DELETE,
@@ -22,12 +25,13 @@ enum SectionTypes {
 struct LocationConfig {
 	std::vector<RequestTypes> allowedRequestTypes;
 	std::string locationPath;
+	std::string redirection;
 };
 
 struct ServerConfig {
 	std::string indexFile;
 	std::string serverName;
-	int clientMaxBodySize;
+	size_t clientMaxBodySize;
 	int listenPort;
 	std::string rootDirectory;
 	bool directoryListing;
@@ -55,13 +59,23 @@ struct ClientState {
 	int serverPort;
 	ServerConfig serverConfig;
 	bool assignedConfig;
+	bool responding;
+	bool killTheChild;
+	bool hasForked;
+	pid_t childPid;
+	int childFd[2];
+	std::string method;
+	std::string body;
 	ClientState() :
 		totalRead(0),
 		contentLength(0), 
 		headerEndIndex(0), 
 		headersComplete(false), 
 		closeConnection(false),
-		assignedConfig(false)
+		assignedConfig(false),
+		responding(false),
+		killTheChild(false),
+		hasForked(false)
 	{};
 };
 

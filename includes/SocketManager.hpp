@@ -33,12 +33,18 @@ class SocketManager {
 		void closeConnection(int fd);
 		int createAndBindSocket(int port);
 		bool isServerSocket(int fd);
-		ServerConfig& getCurrentServer(const HTTPRequest& request, int port);
+		ServerConfig& getCurrentServer(std::string &hostName, int port);
 
 		bool portExists(std::vector<int> &ports, int port);
 		void sendResponse(pollfd &fd);
 		bool readClientData(int fd);
 		void processRequest(int fd);
+
+		std::string handleCGI(ClientState& client, std::string& fullPath);
+		std::string checkAndHandleChildProcess(ClientState& client);
+		void executeChild(ClientState& client, std::string& fullPath);
+		void processCGI(std::string stringCode, int fd);
+
 	public:
 		SocketManager(const HTTPConfig& config);
 		~SocketManager();

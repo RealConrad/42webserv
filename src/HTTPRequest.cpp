@@ -18,6 +18,8 @@ void HTTPRequest::parseRequest(const std::string& request) {
 	lineStream >> this->version;
 	parseHeaders(requestStream);
 	parseBody(requestStream);
+
+
 	SUCCESS("Recived HTTP Request: " << method << " on " << uri);
 }
 

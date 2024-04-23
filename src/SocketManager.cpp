@@ -45,16 +45,21 @@ void SocketManager::pollin(pollfd &fd) {
 		acceptNewConnections(fd.fd);
 	} else {
 		time(&clientStates[fd.fd].lastActivity);
-		fd.events |= POLLOUT;
+		clientStates[fd.fd].responding = true;
 		if (readClientData(fd.fd)) {
+			fd.events |= POLLOUT;
 			processRequest(fd.fd);
 		}
 	}
 }
 void SocketManager::pollout(pollfd &fd) {
-	INFO("Sending response back to client from socket *" << fd.fd << "*");
-	time(&clientStates[fd.fd].lastActivity);
-	sendResponse(fd);
+	if (clientStates[fd.fd].hasForked){
+		processCGI(checkAndHandleChildProcess(clientStates[fd.fd]), fd.fd);
+	} else {
+		INFO("Sending response back to client from socket *" << fd.fd << "*");
+		time(&clientStates[fd.fd].lastActivity);
+		sendResponse(fd);
+	}
 }
 
 void SocketManager::pollerr(pollfd &fd) {
@@ -91,8 +96,12 @@ void SocketManager::run() {
 					pollout(fds[i]);
 				time_t now;
 				time(&now);
+				if (clientStates[fds[i].fd].assignedConfig && clientStates[fds[i].fd].responding && difftime(now, clientStates[fds[i].fd].lastActivity) > clientStates[fds[i].fd].serverConfig.sendTimeout){
+					WARNING("Send timeout on socket *" << fds[i].fd << "*");
+					clientStates[fds[i].fd].killTheChild = true;
+				}
 				if (clientStates[fds[i].fd].assignedConfig && difftime(now, clientStates[fds[i].fd].lastActivity) > clientStates[fds[i].fd].serverConfig.keepAliveTimeout){
-					WARNING("TIMEOUT on socket *" << fds[i].fd << "*");
+					WARNING("Keep-alive timeout on socket *" << fds[i].fd << "*");
 					clientStates[fds[i].fd].closeConnection = true;
 				}
 				if (clientStates[fds[i].fd].closeConnection == true){
@@ -193,7 +202,7 @@ void SocketManager::acceptNewConnections(int server_fd) {
 bool SocketManager::readClientData(int fd) {
 	size_t size = 4096 * 4;
 	char buffer[size];
-	memset(buffer, 0, sizeof(buffer));
+	std::memset(buffer, 0, sizeof(buffer));
 	ssize_t bytesRead = recv(fd, buffer, size, 0);
 	if (bytesRead > 0) {
 		this->clientStates[fd].readBuffer.append(buffer, bytesRead);
@@ -212,6 +221,16 @@ bool SocketManager::readClientData(int fd) {
 				} else {
 					this->clientStates[fd].contentLength = 0;
 				}
+				startPos = this->clientStates[fd].readBuffer.find("Host: ");
+				std::string hostName;
+				if (startPos != std::string::npos) {
+					startPos += 6;
+					size_t endPos = this->clientStates[fd].readBuffer.find("\r\n", startPos);
+					std::istringstream iss(this->clientStates[fd].readBuffer.substr(startPos, endPos - startPos));
+					iss >> hostName;
+				}
+				clientStates[fd].serverConfig = getCurrentServer(hostName, clientStates[fd].serverPort);
+				clientStates[fd].assignedConfig = true;
 			}
 		} else {
 			this->clientStates[fd].totalRead += bytesRead;
@@ -230,23 +249,181 @@ bool SocketManager::readClientData(int fd) {
 	return false;
 }
 
+/* Handle CGI */
+
+std::string SocketManager::handleCGI(ClientState& client, std::string& fullPath) {
+	std::string output;
+	if (!client.hasForked) {
+		INFO("Starting CGI - Forking process");
+		if (pipe(client.childFd) == -1) {
+			ERROR("Failed to create pipe");
+			client.closeConnection = true;
+			return ("Internal server error");
+		}
+		client.childPid = fork();
+		if (client.childPid == -1) {
+			ERROR("Failed to fork");
+			close(client.childFd[0]);
+			close(client.childFd[1]);
+			client.closeConnection = true;
+			return ("Internal server error");
+		} else if (client.childPid == 0) {
+			executeChild(client, fullPath);
+			return ("Internal server error");
+		} else {
+			close(client.childFd[1]);
+			client.hasForked = true;
+			return checkAndHandleChildProcess(client);
+		}
+	} else {
+		return checkAndHandleChildProcess(client);
+	}
+}
+
+void SocketManager::processCGI(std::string stringCode, int fd) {
+	if (!stringCode.empty()){
+		try {
+			HTTPResponse response;
+			if (stringCode == "CGI timeout" || stringCode == "CGI script error" || stringCode == "Internal server error"){
+				response.assignGenericResponse(500, stringCode);
+			} else {
+				response.assignResponse(200, stringCode, "text/html");
+			}
+			this->clientStates[fd].writeBuffer = response.convertToString();
+			this->clientStates[fd].readBuffer.clear();
+			this->clientStates[fd].hasForked = false;
+		} catch (const std::runtime_error& e) {
+			ERROR(e.what());
+		}
+	}
+}
+
+std::string SocketManager::checkAndHandleChildProcess(ClientState& client) {
+	int status;
+	std::string output;
+	char buffer[1024];
+	int bytesRead;
+	time_t now;
+	time(&now);
+	if (difftime(now, client.lastActivity) > client.serverConfig.sendTimeout) {
+		WARNING("CGI process timed out");
+		kill(client.childPid, SIGKILL);
+		waitpid(client.childPid, &status, 0);
+		close(client.childFd[0]);
+		output = "CGI timeout";
+		return(output);
+	}
+	pid_t result = waitpid(client.childPid, &status, WNOHANG);
+	if (result == 0) {
+		return output;
+	} if (result == client.childPid) {
+		if (WIFEXITED(status)) {
+			while ((bytesRead = read(client.childFd[0], buffer, sizeof(buffer) - 1)) > 0) {
+				output += buffer;
+				std::memset(buffer, 0, sizeof(buffer));
+			}
+			return(output);
+		} else {
+			ERROR("CGI script exited with error");
+			close(client.childFd[0]);
+			output = "CGI script error";
+			return(output);
+		}
+	} else {
+		ERROR("waitpid returned unexpected result");
+		close(client.childFd[0]);
+		output = "Internal server error";
+		return(output);
+	}
+}
+
+void SocketManager::executeChild(ClientState& client, std::string& fullPath) {
+	char scriptPath[1024] = {0};
+	std::string valuePart;
+	size_t queryStringPos = fullPath.find("?");
+	if (queryStringPos != std::string::npos) {
+		std::strcpy(scriptPath, fullPath.substr(0, queryStringPos).c_str());
+		valuePart = fullPath.substr(queryStringPos + 1);
+	} else {
+		std::strcpy(scriptPath, fullPath.c_str());
+	}
+	if (client.method == "POST" && valuePart.empty()) {
+		valuePart = client.body;
+	}
+	std::vector<const char*> envp;
+	std::string envQuery = "QUERY_STRING=" + valuePart;
+	std::string envRequestMethod = "REQUEST_METHOD=" + client.method;
+	std::string envContentLength = "CONTENT_LENGTH=" + ::toString(client.contentLength);
+	envp.push_back(envQuery.c_str());
+	envp.push_back(envRequestMethod.c_str());
+	envp.push_back("CONTENT_TYPE=text/html");
+	envp.push_back(NULL);
+	close(client.childFd[0]);
+	dup2(client.childFd[1], STDOUT_FILENO);
+	close(client.childFd[1]);
+	const char* argv[] = {"/usr/bin/python3", scriptPath, NULL};
+	execve(argv[0], const_cast<char* const*>(argv), const_cast<char* const*>(envp.data()));
+	ERROR("execve failed: " + fullPath);
+	exit(1);
+}
+
 
 /* ---------------------------- Handle Responses ---------------------------- */
 
 void SocketManager::processRequest(int fd) {
 	HTTPRequest request(this->clientStates[fd].readBuffer);
+	std::string stringCode = "go";
 	std::string keepAlive = request.getHeader("Connection");
-	if (keepAlive == "keep-alive")
+	std::string uri = request.getURI();
+	size_t queryPos = uri.find('?');
+	if (queryPos != std::string::npos) {
+		uri = uri.substr(0, queryPos);
+	}
+	size_t dotPos = uri.find_last_of('.');
+	std::string extension;
+	if (dotPos != std::string::npos) {
+		extension = uri.substr(dotPos);
+	}
+	if (keepAlive == "keep-alive"){
 		this->clientStates[fd].keepAlive = true;
-	else
+	} else {
 		this->clientStates[fd].keepAlive = false;
+	}
+	if (clientStates[fd].contentLength > clientStates[fd].serverConfig.clientMaxBodySize){
+		stringCode = "413";
+	} else if (extension == ".py") { 
+		std::string fullPath = clientStates[fd].serverConfig.rootDirectory + request.getURI();
+		clientStates[fd].method = request.getMethod();
+		clientStates[fd].body = request.getBody();
+		if (!HTTPResponse::isMethodAllowed(clientStates[fd].method, uri, clientStates[fd].serverConfig)){
+			stringCode = "405";
+		} else if (request.getMethod() == "GET" || request.getMethod() == "POST") {
+			stringCode = handleCGI(clientStates[fd], fullPath);
+		} else {
+			stringCode = "405";
+		}
+	}
+	if (stringCode.empty())
+		return;
 	try {
-		clientStates[fd].serverConfig = getCurrentServer(request, clientStates[fd].serverPort);
-		clientStates[fd].assignedConfig = true;
 		HTTPResponse response;
-		response.prepareResponse(request, this->clientStates[fd].serverConfig);
+		if (stringCode == "413"){
+			WARNING("Body to big! serving 413!");
+			std::string payload = "Request has a body size of " + ::toString(clientStates[fd].contentLength) 
+				+ " bytes which exceeds the server body limit of " + ::toString(clientStates[fd].serverConfig.clientMaxBodySize) + " bytes!"; 
+			response.assignGenericResponse(413, payload);
+		} else if (stringCode == "405"){
+			response.assignGenericResponse(405);
+		} else if (stringCode == "CGI timeout" || stringCode == "CGI script error" || stringCode == "Internal server error"){
+			response.assignGenericResponse(500, stringCode);
+		} else if (stringCode == "go"){
+			response.prepareResponse(request, this->clientStates[fd]);
+		} else {
+			response.assignResponse(200, stringCode, "text/html");
+		}
 		this->clientStates[fd].writeBuffer = response.convertToString();
 		this->clientStates[fd].readBuffer.clear();
+		this->clientStates[fd].hasForked = false;
 	} catch (const std::runtime_error& e) {
 		ERROR(e.what());
 	}
@@ -263,6 +440,7 @@ void SocketManager::sendResponse(pollfd &fd) {
 	if (bytesWritten > 0) {
 		this->clientStates[fd.fd].writeBuffer.erase(0, bytesWritten);
 		if (this->clientStates[fd.fd].writeBuffer.empty()) {
+			clientStates[fd.fd].responding = false;
 			fd.events = POLLIN;
 			SUCCESS("Response sent successfully on socket *" << fd.fd << "*");
 			if (this->clientStates[fd.fd].keepAlive == false) {
@@ -283,9 +461,7 @@ void SocketManager::sendResponse(pollfd &fd) {
 /*                              Helper Functions                              */
 /* -------------------------------------------------------------------------- */
 
-ServerConfig& SocketManager::getCurrentServer(const HTTPRequest& request, int port) {
-	std::string hostName = request.getHeader("Host");
-
+ServerConfig& SocketManager::getCurrentServer(std::string &hostName, int port) {
 	size_t colonPos = hostName.find(":");
 	if (colonPos != std::string::npos) {
 		hostName = hostName.substr(0, colonPos);
@@ -309,7 +485,6 @@ ServerConfig& SocketManager::getCurrentServer(const HTTPRequest& request, int po
 void SocketManager::closeConnection(int fd) {
 	INFO("Closing socket: " << fd);
 	close(fd);
-
 	for (std::vector<struct pollfd>::iterator it = this->fds.begin(); it != this->fds.end();) {
 		if (it->fd == fd) {
 			it = this->fds.erase(it);
@@ -317,7 +492,6 @@ void SocketManager::closeConnection(int fd) {
 			++it;
 		}
 	}
-
 	for (std::vector<int>::iterator it = this->server_fds.begin(); it != this->server_fds.end();) {
 		if (*it == fd) {
 			it = this->server_fds.erase(it);
@@ -325,7 +499,6 @@ void SocketManager::closeConnection(int fd) {
 			++it;
 		}
 	}
-
 	std::map<int, ClientState>::iterator it = this->clientStates.find(fd);
 	if (it != this->clientStates.end()) {
 		this->clientStates.erase(it);
