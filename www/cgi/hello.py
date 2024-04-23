@@ -1,5 +1,2 @@
-import time
-
-for i in range(5):
-	print("Hello, World!")
-	# time.sleep(1)
+for i in range(10):
+	print("<p>Hello, World!</p>")
