@@ -14,6 +14,7 @@
 #include <ctime>
 #include <cstring>
 #include <signal.h>
+#include <sys/wait.h>
 
 #include "Structs.hpp"
 #include "HTTPRequest.hpp"
