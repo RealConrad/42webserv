@@ -350,13 +350,19 @@ std::string SocketManager::checkAndHandleChildProcess(ClientState& client) {
 void SocketManager::executeChild(ClientState& client, std::string& fullPath) {
     char fullPathWritable[1024]; // Ensure the fullPath is within a reasonable limit
     std::strcpy(fullPathWritable, fullPath.c_str());
+	// we need to divide the full path into runPath and PATH_INFO
 
     close(client.childFd[0]);
     dup2(client.childFd[1], STDOUT_FILENO);
     close(client.childFd[1]);
 
     const char* argv[] = {"/usr/bin/python3", fullPathWritable, NULL};
-    const char* envp[] = {NULL};
+
+	if (client.method == "GET"){
+    	const char* envp[] = {NULL}; // PATH_INFO
+	} else {
+    	const char* envp[] = {NULL}; // client.bodyCgi 
+	}
 
     execve(argv[0], const_cast<char* const*>(argv), const_cast<char* const*>(envp));
 
@@ -381,10 +387,16 @@ void SocketManager::processRequest(int fd) {
 		this->clientStates[fd].keepAlive = false;
 	if (clientStates[fd].contentLength > clientStates[fd].serverConfig.clientMaxBodySize){
 		stringCode = "413";
-	} else if (endsWith(request.getURI(), ".py")) {
+	} else if (endsWith(request.getURI(), ".py")) { /// Modify to find .py or .py?whatever 
 		std::string fullPath = clientStates[fd].serverConfig.rootDirectory + request.getURI();
-		if (request.getMethod() == "GET")
+		clientStates[fd].method = request.getMethod();
+		if (clientStates[fd].method == "POST"){
+			clientStates[fd].bodyCgi = request.getBody();
+		}
+		if (clientStates[fd].method == "GET" || clientStates[fd].method == "POST")
 			stringCode = handleCGI(clientStates[fd], fullPath);
+		else
+			stringCode = "403";
 	}
 	if (stringCode.empty())
 		return;
@@ -396,6 +408,8 @@ void SocketManager::processRequest(int fd) {
 			std::string payload = "Request has a body size of " + ::toString(clientStates[fd].contentLength) 
 				+ " bytes which exceeds the server body limit of " + ::toString(clientStates[fd].serverConfig.clientMaxBodySize) + " bytes!"; 
 			response.assignGenericResponse(413, payload);
+		} else if (stringCode == "403"){
+			response.assignGenericResponse(403);
 		} else if (stringCode == "CGI timeout" || stringCode == "CGI script error" || stringCode == "Internal server error"){
 			response.assignGenericResponse(500, stringCode);
 		} else if (stringCode == "go"){

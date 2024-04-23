@@ -64,6 +64,8 @@ struct ClientState {
 	bool hasForked;
 	pid_t childPid;
 	int childFd[2];
+	std::string method;
+	std::string bodyCgi;
 	ClientState() :
 		totalRead(0),
 		contentLength(0), 
