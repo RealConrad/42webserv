@@ -45,7 +45,6 @@ void HTTPResponse::prepareResponse(HTTPRequest& request, ClientState& client) {
 	}
 	switch (stringToRequestType(method)) {
 		case GET:
-			DEBUG("GET FUCKED");
 			handleRequestGET(request, client);
 			break;
 		case POST:
@@ -282,96 +281,210 @@ void HTTPResponse::serveRegularFile(const std::string& uri, const std::string& f
 	}
 }
 
-void HTTPResponse::serveCGI(ClientState& client, std::string& fullPath){
-	INFO("CGI MOTHERFUCKER");
-	int status;
-	std::string content;
 
-	if (pipe(this->fd) == -1 || pipe(this->fd2) == -1) {
-		ERROR("Failed to create pipe()");
-		client.closeConnection = true;
-		return;
-	}
-	// if (!client.hasForked) {
-		DEBUG("FORKING MOTHERFUCKER");
-		client.hasForked = true;
-		this->pid = fork();
-		if (this->pid == -1) {
-			ERROR("Failed to create child process");
-			closePipes();
-			client.closeConnection = true;
-		} else if (this->pid == 0) 
-			executeChild(fullPath); 
-	 else {
-			DEBUG("U DONE BRO?");
-			close(fd[1]); // Close the writing end in the parent
-			char buffer[1024 * 4];
-			std::string output;
-			int bytesRead = 1;
-			while (!client.killTheChild && bytesRead > 0) {
-				time_t now;
-				time(&now);
-				bytesRead = read(fd[0], buffer, sizeof(buffer) - 1);
-				if (client.assignedConfig && client.responding && difftime(now, client.lastActivity) > client.serverConfig.sendTimeout){
-					WARNING("Send timeout on socket FUCK*");
-					client.killTheChild = true;
-				}
-				DEBUG("GOT THIS FROM THE CHILD ->" << buffer);
-				buffer[bytesRead] = '\0';
-				output += buffer;
-			}
-			if (client.killTheChild){
-				ERROR("Killing The Child...");
-				kill(this->pid, SIGKILL);
-				close(fd[0]);
-				assignGenericResponse(500, "Child got killed... U MONSTER!");
-			}
-			pid_t check_pid = waitpid(this->pid, &status, WNOHANG);
-			DEBUG(check_pid);
-			if (check_pid == 0) {
-				return; // ???
-			} else if (check_pid > 0) {
-				if (WIFEXITED(status)) {
-					assignResponse(200, output, "text/html");
-					client.hasForked = false;
-				} else {
-					ERROR("Script did not exit normally. CHECK_PID: " << check_pid);
-					assignGenericResponse(500, "");
-				}
-			} else {
-				ERROR("Invalid CHECK_PID:: " << check_pid);
-				assignGenericResponse(500, "");
-			}
-			close(fd[0]);
+// void HTTPResponse::serveCGI(ClientState& client, std::string& fullPath) {
+//     // if (!client.hasForked) {
+//         INFO("Starting CGI - Forking process");
+//         if (pipe(this->fd) == -1) {
+//             ERROR("Failed to create pipe");
+//             client.closeConnection = true;
+//             return;
+//         }
+
+//         this->pid = fork();
+//         if (this->pid == -1) {
+//             ERROR("Failed to fork");
+//             closePipes();
+//             client.closeConnection = true;
+//         } else if (this->pid == 0) {
+//             executeChild(fullPath);
+//         } else {
+//             close(this->fd[1]);  // Close the write end of the pipe in the parent
+//             // client.hasForked = true;
+
+//             DEBUG("Child process forked successfully, PID: " << this->pid);
+// 			client.childPid = this->pid;
+//         	// checkAndHandleChildProcess(client);
+//         }
+//     // } else {
+//     // }
+// }
+
+// void HTTPResponse::checkAndHandleChildProcess(ClientState& client) {
+//     int status;
+//     std::string output;
+//     char buffer[1024];
+//     int bytesRead;
+//     // time_t startTime = time(NULL);
+//     time_t now;
+// 	DEBUG("checking the child..."<< pid);
+//     while (true) {
+//         time(&now);
+//         if (difftime(now, client.lastActivity) > client.serverConfig.sendTimeout) {
+//             WARNING("CGI process timed out");
+//             kill(this->pid, SIGKILL); // Force kill the child process
+//             waitpid(this->pid, &status, 0); // Clean up the zombie process
+//             assignGenericResponse(500, "CGI timeout");
+//             client.hasForked = false;
+//             close(this->fd[0]);
+//             break;
+//         }
+
+//         // Non-blocking check if child process has exited
+//         pid_t result = waitpid(this->pid, &status, WNOHANG);
+//         if (result == 0) {
+//             continue; // Child still running, check again
+//         } if (result == this->pid) {
+//             if (WIFEXITED(status)) {
+//                 // Read remaining data from pipe
+//                 while ((bytesRead = read(this->fd[0], buffer, sizeof(buffer) - 1)) > 0) {
+//                     buffer[bytesRead] = '\0';
+//                     output += buffer;
+//                 }
+//                 assignResponse(200, output, "text/html");
+// 				break;
+//                 // client.hasForked = false;
+//             } else {
+//                 ERROR("CGI script exited with error");
+//                 assignGenericResponse(500, "CGI script error");
+// 				break;
+//                 // client.hasForked = false;
+//             }
+//             close(this->fd[0]);
+//         } else {
+//             ERROR("waitpid returned unexpected result");
+//             assignGenericResponse(500, "Internal server error");
+//             close(this->fd[0]);
+// 			break;
+//             // client.hasForked = false;
+//         }
+// 	}
+// }
+
+// void HTTPResponse::executeChild(const std::string& fullPath) {
+//     DEBUG("Executing child process");
+//     char fullPathWritable[1024]; // Ensure the fullPath is within a reasonable limit
+//     std::strcpy(fullPathWritable, fullPath.c_str());
+
+//     close(this->fd[0]);
+//     dup2(this->fd[1], STDOUT_FILENO);
+//     close(this->fd[1]);
+
+//     const char* argv[] = {"/usr/bin/python3", fullPathWritable, NULL};
+//     const char* envp[] = {NULL};
+
+//     execve(argv[0], const_cast<char* const*>(argv), const_cast<char* const*>(envp));
+
+//     ERROR("execve failed: " << fullPath);
+//     exit(1); // If execve returns, it's an error
+// }
+
+// void HTTPResponse::closePipes() {
+//     close(this->fd[0]);
+//     close(this->fd[1]);
+// }
+
+
+// void HTTPResponse::serveCGI(ClientState& client, std::string& fullPath){
+// 	INFO("CGI MOTHERFUCKER");
+// 	int status;
+// 	std::string content;
+
+// 	if (pipe(this->fd) == -1 || pipe(this->fd2) == -1) {
+// 		ERROR("Failed to create pipe()");
+// 		client.closeConnection = true;
+// 		return;
+// 	}
+// 	// if (!client.hasForked) {
+// 		DEBUG("FORKING MOTHERFUCKER");
+// 		client.hasForked = true;
+// 		this->pid = fork();
+// 		if (this->pid == -1) {
+// 			ERROR("Failed to create child process");
+// 			closePipes();
+// 			client.closeConnection = true;
+// 		} else if (this->pid == 0) 
+// 			executeChild(fullPath); 
+// 	 else {
+// 			DEBUG("U DONE BRO?");
+// 			close(fd[1]); // Close the writing end in the parent
+// 			char buffer[1024];
+// 			std::string output;
+// 			int bytesRead = 1;
+// 			while (!client.killTheChild && bytesRead > 0) {
+// 				time_t now;
+// 				time(&now);
+// 				DEBUG("READING AT " << now);
+// 				bytesRead = read(fd[0], buffer, sizeof(buffer) - 1);
+// 				buffer[bytesRead] = '\0';
+// 				time(&now);
+// 				DEBUG("READ DONE AT " << now);
+// 				if (client.assignedConfig && client.responding && difftime(now, client.lastActivity) > client.serverConfig.sendTimeout){
+// 					WARNING("Send timeout on socket FUCK*");
+// 					client.killTheChild = true;
+// 					break;
+// 				}
+// 				DEBUG("GOT THIS FROM THE CHILD ->" << buffer);
+// 				output += buffer;
+// 			}
+// 			if (client.killTheChild){
+// 				ERROR("Killing The Child...");
+// 				kill(this->pid, SIGKILL);
+// 				close(fd[0]);
+// 				assignGenericResponse(500, "Child got killed... U MONSTER!");
+// 			}
+// 			pid_t check_pid = waitpid(this->pid, &status, WNOHANG);
+// 			DEBUG(check_pid);
+// 			if (check_pid == 0) {
+// 				return; // ???
+// 			} else if (check_pid > 0) {
+// 				if (WIFEXITED(status)) {
+// 					assignResponse(200, output, "text/html");
+// 					client.hasForked = false;
+// 				} else {
+// 					ERROR("Script did not exit normally. CHECK_PID: " << check_pid);
+// 					assignGenericResponse(500, "");
+// 				}
+// 			} else {
+// 				ERROR("Invalid CHECK_PID:: " << check_pid);
+// 				assignGenericResponse(500, "");
+// 			}
+// 			close(fd[0]);
 		
-	}
-}
+// 	}
+// }
 
-void HTTPResponse::executeChild(const std::string& fullPath) {
-	DEBUG("TIME FOR CHILDREN TO GET EXECUTED!!! HAHAHAHAAHAHHAHAHA");
-    // Ensure the fullPath length is within a reasonable limit
-    if (fullPath.length() >= 1024) {
-        ERROR("Path too long");
-        return;
-    }
+// void HTTPResponse::executeChild(const std::string& fullPath) {
+// 	DEBUG("TIME FOR CHILDREN TO GET EXECUTED!!! HAHAHAHAAHAHHAHAHA");
+//     // Ensure the fullPath length is within a reasonable limit
+//     if (fullPath.length() >= 1024) {
+//         ERROR("Path too long");
+//         return;
+//     }
 
-    char fullPathWritable[1024]; // Static array with fixed size
-    std::strcpy(fullPathWritable, fullPath.c_str()); // Copy the path into the writable buffer
+//     char fullPathWritable[1024]; // Static array with fixed size
+//     std::strcpy(fullPathWritable, fullPath.c_str()); // Copy the path into the writable buffer
 
-    close(this->fd[0]);
-    dup2(this->fd[1], STDOUT_FILENO);
-    close(this->fd[1]);
+//     close(this->fd[0]);
+//     dup2(this->fd[1], STDOUT_FILENO);
+//     close(this->fd[1]);
 
-    // Setup the arguments for execve
-    const char* argv[] = {"/usr/bin/python3", fullPathWritable, NULL};
-    const char* envp[] = {NULL};
+//     // Setup the arguments for execve
+//     const char* argv[] = {"/usr/bin/python3", fullPathWritable, NULL};
+//     const char* envp[] = {NULL};
 
-    execve(argv[0], const_cast<char* const*>(argv), const_cast<char* const*>(envp));
+//     execve(argv[0], const_cast<char* const*>(argv), const_cast<char* const*>(envp));
 
-    ERROR("execve() failed to execute: " << fullPath);
-    exit(1);
-}
+//     ERROR("execve() failed to execute: " << fullPath);
+//     exit(1);
+// }
 
+// void HTTPResponse::closePipes() {
+// 	close(this->fd[0]);
+// 	close(this->fd[1]);
+// 	close(this->fd2[0]);
+// 	close(this->fd2[1]);
+// }
 
 
 // void HTTPResponse::executeChild(std::string fullPath) {
@@ -387,12 +500,6 @@ void HTTPResponse::executeChild(const std::string& fullPath) {
 // 	exit(1);
 // }
 
-void HTTPResponse::closePipes() {
-	close(this->fd[0]);
-	close(this->fd[1]);
-	close(this->fd2[0]);
-	close(this->fd2[1]);
-}
 
 bool HTTPResponse::cheekySlashes(const std::string& uri) {
 	if (uri.size() == 0)
@@ -421,14 +528,14 @@ void HTTPResponse::serveFile(ClientState& client, const std::string& uri) {
 		else
 			assignGenericResponse(405, "This Directory is over 9000!!!");
 	} else if (S_ISREG(path_stat.st_mode)) {
-		if (endsWith(uri, ".py")) {
-			serveCGI(client, fullPath);
-		} else {
-			if (client.killTheChild)
-				client.closeConnection = true;
-			else
+		// if (endsWith(uri, ".py")) {
+		// 	serveCGI(client, fullPath);
+		// } else {
+			// if (client.killTheChild)
+			// 	client.closeConnection = true;
+			// else
 				serveRegularFile(uri, fullPath);
-		}
+		// }
 	} else {
 		WARNING("Path '" << fullPath << "' could not be recognised! Serving 404 page");
 		assignGenericResponse(404, "These Are Not the Files You Are Looking For");

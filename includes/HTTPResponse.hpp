@@ -28,9 +28,9 @@ class HTTPResponse {
 		std::map<std::string, std::string> headers;
 		static const std::map<int, std::string> statusCodes;
 		std::string body;
-		pid_t pid;
-		int fd[2];
-		int fd2[2];
+		// pid_t pid;
+		// int fd[2];
+		// int fd2[2];
 
 		static std::map<int, std::string> initializeStatusCodes();
 	public:
@@ -52,6 +52,7 @@ class HTTPResponse {
 		void serveDeletePage(const std::string& uri, const std::string& fullPath);
 		void serveCGI(ClientState& client, std::string& fullPath);
 		void executeChild(const std::string& fullPath);
+		void checkAndHandleChildProcess(ClientState& client);
 		void closePipes();
 
 		/* -------------------------------------------------------------------------- */

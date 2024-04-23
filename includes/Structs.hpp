@@ -6,6 +6,9 @@
 #include <string>
 #include <ctime>
 
+class HTTPRequest;
+class HTTPResponse;
+
 enum RequestTypes {
 	GET,
 	DELETE,
@@ -59,6 +62,8 @@ struct ClientState {
 	bool responding;
 	bool killTheChild;
 	bool hasForked;
+	pid_t childPid;
+	int childFd[2];
 	ClientState() :
 		totalRead(0),
 		contentLength(0), 

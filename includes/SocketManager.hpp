@@ -39,6 +39,12 @@ class SocketManager {
 		void sendResponse(pollfd &fd);
 		bool readClientData(int fd);
 		void processRequest(int fd);
+
+		std::string handleCGI(ClientState& client, std::string& fullPath);
+		std::string checkAndHandleChildProcess(ClientState& client);
+		void executeChild(ClientState& client, std::string& fullPath);
+		void processCGI(std::string stringCode, int fd);
+
 	public:
 		SocketManager(const HTTPConfig& config);
 		~SocketManager();
