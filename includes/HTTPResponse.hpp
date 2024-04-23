@@ -28,9 +28,6 @@ class HTTPResponse {
 		std::map<std::string, std::string> headers;
 		static const std::map<int, std::string> statusCodes;
 		std::string body;
-		// pid_t pid;
-		// int fd[2];
-		// int fd2[2];
 
 		static std::map<int, std::string> initializeStatusCodes();
 	public:
@@ -61,7 +58,7 @@ class HTTPResponse {
 		std::string convertToString() const;
 		std::string determineContentType(std::string requestURI);
 		void serveRegularFile(const std::string& uri, const std::string& fullPath);
-		bool isMethodAllowed(const std::string& method, const std::string& uri, const ServerConfig& serverConfig);
+		static bool isMethodAllowed(const std::string& method, const std::string& uri, const ServerConfig& serverConfig);
 		std::string isRedirection(const std::string& uri, const ServerConfig& serverConfig);
 		std::string extractFolderName(const std::string& uri);
 		bool cheekySlashes(const std::string& uri);

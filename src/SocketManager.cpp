@@ -54,8 +54,6 @@ void SocketManager::pollin(pollfd &fd) {
 }
 void SocketManager::pollout(pollfd &fd) {
 	if (clientStates[fd.fd].hasForked){
-		// processRequest(fd.fd);
-		// DEBUG("Checking for child finish...")
 		processCGI(checkAndHandleChildProcess(clientStates[fd.fd]), fd.fd);
 	} else {
 		INFO("Sending response back to client from socket *" << fd.fd << "*");
@@ -204,7 +202,7 @@ void SocketManager::acceptNewConnections(int server_fd) {
 bool SocketManager::readClientData(int fd) {
 	size_t size = 4096 * 4;
 	char buffer[size];
-	memset(buffer, 0, sizeof(buffer));
+	std::memset(buffer, 0, sizeof(buffer));
 	ssize_t bytesRead = recv(fd, buffer, size, 0);
 	if (bytesRead > 0) {
 		this->clientStates[fd].readBuffer.append(buffer, bytesRead);
@@ -253,7 +251,6 @@ bool SocketManager::readClientData(int fd) {
 
 /* Handle CGI */
 
-
 std::string SocketManager::handleCGI(ClientState& client, std::string& fullPath) {
 	std::string output;
 	if (!client.hasForked) {
@@ -274,7 +271,7 @@ std::string SocketManager::handleCGI(ClientState& client, std::string& fullPath)
 			executeChild(client, fullPath);
 			return ("Internal server error");
 		} else {
-			close(client.childFd[1]);  // Close the write end of the pipe in the parent
+			close(client.childFd[1]);
 			client.hasForked = true;
 			return checkAndHandleChildProcess(client);
 		}
@@ -308,39 +305,32 @@ std::string SocketManager::checkAndHandleChildProcess(ClientState& client) {
 	int bytesRead;
 	time_t now;
 	time(&now);
-	// DEBUG("checking the child..."<< client.childPid << " at " << now);
 	if (difftime(now, client.lastActivity) > client.serverConfig.sendTimeout) {
 		WARNING("CGI process timed out");
-		kill(client.childPid, SIGKILL); // Force kill the child process
-		waitpid(client.childPid, &status, 0); // Clean up the zombie process
-		// client.hasForked = false;
+		kill(client.childPid, SIGKILL);
+		waitpid(client.childPid, &status, 0);
 		close(client.childFd[0]);
 		output = "CGI timeout";
 		return(output);
 	}
-	// Non-blocking check if child process has exited
 	pid_t result = waitpid(client.childPid, &status, WNOHANG);
 	if (result == 0) {
-		return output; // Child still running, check again
+		return output;
 	} if (result == client.childPid) {
 		if (WIFEXITED(status)) {
-			// Read remaining data from pipe
-			while ((bytesRead = read(client.childFd[0], buffer, sizeof(buffer))) > 0) {
+			while ((bytesRead = read(client.childFd[0], buffer, sizeof(buffer) - 1)) > 0) {
 				output += buffer;
+				std::memset(buffer, 0, sizeof(buffer));
 			}
-			// client.hasForked = false;
-			// close(client.childFd[0]);
 			return(output);
 		} else {
 			ERROR("CGI script exited with error");
-			// client.hasForked = false; 
 			close(client.childFd[0]);
 			output = "CGI script error";
 			return(output);
 		}
 	} else {
 		ERROR("waitpid returned unexpected result");
-		// client.hasForked = false; 
 		close(client.childFd[0]);
 		output = "Internal server error";
 		return(output);
@@ -350,7 +340,6 @@ std::string SocketManager::checkAndHandleChildProcess(ClientState& client) {
 void SocketManager::executeChild(ClientState& client, std::string& fullPath) {
 	char scriptPath[1024] = {0};
 	std::string valuePart;
-
 	size_t queryStringPos = fullPath.find("?");
 	if (queryStringPos != std::string::npos) {
 		std::strcpy(scriptPath, fullPath.substr(0, queryStringPos).c_str());
@@ -358,35 +347,22 @@ void SocketManager::executeChild(ClientState& client, std::string& fullPath) {
 	} else {
 		std::strcpy(scriptPath, fullPath.c_str());
 	}
-
 	if (client.method == "POST" && valuePart.empty()) {
 		valuePart = client.body;
 	}
-
-	// Environment variable setup
 	std::vector<const char*> envp;
 	std::string envQuery = "QUERY_STRING=" + valuePart;
 	std::string envRequestMethod = "REQUEST_METHOD=" + client.method;
 	std::string envContentLength = "CONTENT_LENGTH=" + ::toString(client.contentLength);
-
 	envp.push_back(envQuery.c_str());
 	envp.push_back(envRequestMethod.c_str());
 	envp.push_back("CONTENT_TYPE=text/html");
 	envp.push_back(NULL);
-
-
-	DEBUG("CONTENT_LENGTH=" + ::toString(client.contentLength));
-	DEBUG("QUERY_STRING=" + valuePart);
-	DEBUG("REQUEST_METHOD=" + client.method);
-	DEBUG("PATH: " + std::string(scriptPath));
-
 	close(client.childFd[0]);
 	dup2(client.childFd[1], STDOUT_FILENO);
 	close(client.childFd[1]);
-
 	const char* argv[] = {"/usr/bin/python3", scriptPath, NULL};
 	execve(argv[0], const_cast<char* const*>(argv), const_cast<char* const*>(envp.data()));
-
 	ERROR("execve failed: " + fullPath);
 	exit(1);
 }
@@ -396,40 +372,39 @@ void SocketManager::executeChild(ClientState& client, std::string& fullPath) {
 
 void SocketManager::processRequest(int fd) {
 	HTTPRequest request(this->clientStates[fd].readBuffer);
-	BLOCK(this->clientStates[fd].readBuffer);
 	std::string stringCode = "go";
 	std::string keepAlive = request.getHeader("Connection");
 	std::string uri = request.getURI();
-	
 	size_t queryPos = uri.find('?');
 	if (queryPos != std::string::npos) {
 		uri = uri.substr(0, queryPos);
 	}
-
 	size_t dotPos = uri.find_last_of('.');
 	std::string extension;
 	if (dotPos != std::string::npos) {
 		extension = uri.substr(dotPos);
 	}
-
-	if (keepAlive == "keep-alive")
+	if (keepAlive == "keep-alive"){
 		this->clientStates[fd].keepAlive = true;
-	else
+	} else {
 		this->clientStates[fd].keepAlive = false;
+	}
 	if (clientStates[fd].contentLength > clientStates[fd].serverConfig.clientMaxBodySize){
 		stringCode = "413";
 	} else if (extension == ".py") { 
 		std::string fullPath = clientStates[fd].serverConfig.rootDirectory + request.getURI();
 		clientStates[fd].method = request.getMethod();
 		clientStates[fd].body = request.getBody();
-		if (request.getMethod() == "GET" || request.getMethod() == "POST")
+		if (!HTTPResponse::isMethodAllowed(clientStates[fd].method, uri, clientStates[fd].serverConfig)){
+			stringCode = "405";
+		} else if (request.getMethod() == "GET" || request.getMethod() == "POST") {
 			stringCode = handleCGI(clientStates[fd], fullPath);
-		else
-			stringCode = "403";
+		} else {
+			stringCode = "405";
+		}
 	}
 	if (stringCode.empty())
 		return;
-
 	try {
 		HTTPResponse response;
 		if (stringCode == "413"){
@@ -437,8 +412,8 @@ void SocketManager::processRequest(int fd) {
 			std::string payload = "Request has a body size of " + ::toString(clientStates[fd].contentLength) 
 				+ " bytes which exceeds the server body limit of " + ::toString(clientStates[fd].serverConfig.clientMaxBodySize) + " bytes!"; 
 			response.assignGenericResponse(413, payload);
-		} else if (stringCode == "403"){
-			response.assignGenericResponse(403);
+		} else if (stringCode == "405"){
+			response.assignGenericResponse(405);
 		} else if (stringCode == "CGI timeout" || stringCode == "CGI script error" || stringCode == "Internal server error"){
 			response.assignGenericResponse(500, stringCode);
 		} else if (stringCode == "go"){
@@ -486,59 +461,6 @@ void SocketManager::sendResponse(pollfd &fd) {
 /*                              Helper Functions                              */
 /* -------------------------------------------------------------------------- */
 
-// void SocketManager::checkAndHandleChildProcess(ClientState& client) {
-//     int status;
-//     std::string output;
-//     char buffer[1024];
-//     int bytesRead;
-//     // time_t startTime = time(NULL);
-//     time_t now;
-// 	DEBUG("checking the child..." << client.childPid);
-//     // while (true) {
-//         time(&now);
-//         if (difftime(now, client.lastActivity) > client.serverConfig.sendTimeout) {
-// 			HTTPResponse response;
-//             WARNING("CGI process timed out");
-//             kill(client.childPid, SIGKILL); // Force kill the child process
-//             waitpid(client.childPid, &status, 0); // Clean up the zombie process
-//             response.assignGenericResponse(500, "CGI timeout");
-//             client.hasForked = false;
-//             close(this->fd[0]);
-//             break;
-//         }
-
-//         // Non-blocking check if child process has exited
-//         pid_t result = waitpid(this->pid, &status, WNOHANG);
-//         if (result == 0) {
-//             continue; // Child still running, check again
-//         } if (result == this->pid) {
-//             if (WIFEXITED(status)) {
-//                 // Read remaining data from pipe
-//                 while ((bytesRead = read(this->fd[0], buffer, sizeof(buffer) - 1)) > 0) {
-//                     buffer[bytesRead] = '\0';
-//                     output += buffer;
-//                 }
-//                 assignResponse(200, output, "text/html");
-// 				break;
-//                 // client.hasForked = false;
-//             } else {
-//                 ERROR("CGI script exited with error");
-//                 assignGenericResponse(500, "CGI script error");
-// 				break;
-//                 // client.hasForked = false;
-//             }
-//             close(this->fd[0]);
-//         } else {
-//             ERROR("waitpid returned unexpected result");
-//             assignGenericResponse(500, "Internal server error");
-//             close(this->fd[0]);
-// 			break;
-//             // client.hasForked = false;
-//         }
-// 	// }
-// }
-
-
 ServerConfig& SocketManager::getCurrentServer(std::string &hostName, int port) {
 	size_t colonPos = hostName.find(":");
 	if (colonPos != std::string::npos) {
@@ -563,7 +485,6 @@ ServerConfig& SocketManager::getCurrentServer(std::string &hostName, int port) {
 void SocketManager::closeConnection(int fd) {
 	INFO("Closing socket: " << fd);
 	close(fd);
-
 	for (std::vector<struct pollfd>::iterator it = this->fds.begin(); it != this->fds.end();) {
 		if (it->fd == fd) {
 			it = this->fds.erase(it);
@@ -571,7 +492,6 @@ void SocketManager::closeConnection(int fd) {
 			++it;
 		}
 	}
-
 	for (std::vector<int>::iterator it = this->server_fds.begin(); it != this->server_fds.end();) {
 		if (*it == fd) {
 			it = this->server_fds.erase(it);
@@ -579,7 +499,6 @@ void SocketManager::closeConnection(int fd) {
 			++it;
 		}
 	}
-
 	std::map<int, ClientState>::iterator it = this->clientStates.find(fd);
 	if (it != this->clientStates.end()) {
 		this->clientStates.erase(it);
