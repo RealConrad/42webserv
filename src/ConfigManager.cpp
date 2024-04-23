@@ -22,7 +22,7 @@ void ConfigManager::parseConfigFile(std::string configFilePath) {
         line = trim(line);
         if (line.empty() || line[0] == '#')
             continue;
-        if (line == "http {") { // Entering HTTP section
+        if (line == "http {") {
             parseHttpSection(configFile, line);
         } else {
             throw std::runtime_error("Unexpected line: " + line);
@@ -50,7 +50,7 @@ void ConfigManager::initServerConfig(ServerConfig& serverConfig) {
 /* -------------------------------------------------------------------------- */
 
 void ConfigManager::parseHttpSection(std::ifstream& configFile, std::string& line) {
-    this->sectionStack.push(HTTP); // Add HTTP to the stack
+    this->sectionStack.push(HTTP);
 
     while (!sectionStack.empty()) {
         if (!getline(configFile, line)) {
@@ -63,7 +63,7 @@ void ConfigManager::parseHttpSection(std::ifstream& configFile, std::string& lin
         std::string key, value;
         splitKeyValue(line, key, value);
         if (line == "}") {
-            sectionStack.pop(); // Exiting current section
+            sectionStack.pop();
         } else if (key == "server_timeout_time") {
             if (value.empty())
                 throw std::runtime_error("Value is missing for 'server_timeout_time'");
@@ -84,7 +84,7 @@ void ConfigManager::parseHttpSection(std::ifstream& configFile, std::string& lin
 /* -------------------------------------------------------------------------- */
 
 void ConfigManager::parseServerSection(std::ifstream& configFile, std::string& line, ServerConfig& serverConfig) {
-    this->sectionStack.push(SERVER); // Entering Server section, so add it to stack
+    this->sectionStack.push(SERVER);
 
     while (!this->sectionStack.empty()) {
         getline(configFile, line);
@@ -93,8 +93,8 @@ void ConfigManager::parseServerSection(std::ifstream& configFile, std::string& l
             continue;
 
         if (line == "}") {
-            this->sectionStack.pop(); // Exiting current section
-            break; // Break since we're done with this server section
+            this->sectionStack.pop();
+            break;
         } else if (line.find("location") == 0) {
             LocationConfig locConfig;
             parseLocationSection(configFile, line, locConfig);
@@ -104,9 +104,9 @@ void ConfigManager::parseServerSection(std::ifstream& configFile, std::string& l
         }
     }
     if (!this->required.empty()){
-        std::string missing = this->required[0]; // Start with the first element
+        std::string missing = this->required[0];
         for (size_t i = 1; i < this->required.size(); ++i) {
-            missing += " " + this->required[i]; // Append the rest of the elements with a leading space
+            missing += " " + this->required[i];
         }
         throw std::runtime_error("Server config missing required elements: " + missing);
     }
@@ -148,7 +148,7 @@ void ConfigManager::handleServerDirective(std::string& line, ServerConfig& serve
 /* -------------------------------------------------------------------------- */
 
 void ConfigManager::parseLocationSection(std::ifstream& configFile, std::string& line, LocationConfig& locConfig) {
-    this->sectionStack.push(LOCATION); // Entering location section
+    this->sectionStack.push(LOCATION);
     std::string key, value;
     
     checkLocationPath(line, locConfig);
@@ -158,14 +158,14 @@ void ConfigManager::parseLocationSection(std::ifstream& configFile, std::string&
         if (line.empty() || line[0] == '#')
             continue;
         if (line == "}") {
-            this->sectionStack.pop(); // Exit current section
-            break; // Break since we are done with location section
+            this->sectionStack.pop();
+            break;
         } else {
             splitKeyValue(line, key, value);
             if (key == "request_types") {
                 std::istringstream iss(value);
                 std::string requestType;
-                while (iss >> requestType) { // will automatically split it by whitespace
+                while (iss >> requestType) {
                     RequestTypes type = stringToRequestType(trim(requestType));
                     locConfig.allowedRequestTypes.push_back(type);
                 } 
@@ -182,23 +182,17 @@ void ConfigManager::checkLocationPath(std::string& line, LocationConfig& locConf
     std::string key;
     splitKeyValue(line, key, locConfig.locationPath);
 
-    // After calling splitKeyValue, locConfig.locationPath contains "/path {"
-    // First, trim the trailing "{" from locConfig.locationPath
     size_t bracePos = locConfig.locationPath.find('{');
     if (bracePos != std::string::npos) {
         locConfig.locationPath = locConfig.locationPath.substr(0, bracePos);
-        locConfig.locationPath = trim(locConfig.locationPath); // Trim any whitespace left after removing "{"
+        locConfig.locationPath = trim(locConfig.locationPath);
     }
-
-    // Check the number of parts in the location directive
     std::istringstream iss(line);
     std::vector<std::string> parts;
     std::string part;
     while (iss >> part) {
         parts.push_back(part);
     }
-
-    // Expecting 3 parts: "location", "/path", and "{"
     if (parts.size() != 3 || locConfig.locationPath.empty()) {
         throw std::runtime_error("Invalid location path format: " + line);
     }
@@ -208,8 +202,6 @@ void ConfigManager::checkLocationPath(std::string& line, LocationConfig& locConf
 /*                               Validate Config                              */
 /* -------------------------------------------------------------------------- */
 
-
-// TODO: MAYBE EXPAND FOR OTHER CHECKS?
 void ConfigManager::validateConfiguration() {
     if (this->httpConfig.server_timeout_time == -1)
         throw std::runtime_error("Http config missing required 'server_timeout_time'");
@@ -217,4 +209,3 @@ void ConfigManager::validateConfiguration() {
         throw std::runtime_error("Http config missing required 'server'");
     }
 }
-

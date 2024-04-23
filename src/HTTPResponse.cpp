@@ -10,10 +10,7 @@ std::map<int, std::string> HTTPResponse::initializeStatusCodes() {
 	std::map<int, std::string> statusCodes;
 	statusCodes[200] = "OK";
 	statusCodes[201] = "Created";
-	statusCodes[202] = "Accepted";
-	statusCodes[301] = "Moved Permanently";
 	statusCodes[302] = "Found";
-	statusCodes[400] = "Bad Request";
 	statusCodes[403] = "Forbidden";
 	statusCodes[404] = "Not Found";
 	statusCodes[405] = "Method Not Allowed";
@@ -21,7 +18,6 @@ std::map<int, std::string> HTTPResponse::initializeStatusCodes() {
 	statusCodes[413] = "Payload Too Large";
 	statusCodes[500] = "Internal Server Error";
 	statusCodes[501] = "Not Implemented";
-	statusCodes[504] = "Gateway Timeout";
 	return statusCodes;
 }
 
@@ -60,6 +56,10 @@ void HTTPResponse::prepareResponse(HTTPRequest& request, ClientState& client) {
 	}
 }
 
+/* -------------------------------------------------------------------------- */
+/*                                 GET Method                                 */
+/* -------------------------------------------------------------------------- */
+
 void HTTPResponse::handleRequestGET(const HTTPRequest& request, ClientState& client) {
 	std::string requestURI = request.getURI();
 	static int image = 0;
@@ -86,6 +86,10 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, ClientState& cli
 		serveFile(client, requestURI);
 	}
 }
+
+/* -------------------------------------------------------------------------- */
+/*                                 POST Method                                */
+/* -------------------------------------------------------------------------- */
 
 void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerConfig& serverConfig) {
     std::string requestURI = request.getURI();
@@ -116,6 +120,10 @@ void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerCon
     }
 }
 
+/* -------------------------------------------------------------------------- */
+/*                                DELETE Method                               */
+/* -------------------------------------------------------------------------- */
+
 void HTTPResponse::handleRequestDELETE(const HTTPRequest& request, const ServerConfig& serverConfig) {
 	std::string requestURI = request.getURI();
 	INFO("DELETE method called for server: " << serverConfig.serverName);
@@ -133,6 +141,10 @@ void HTTPResponse::handleRequestDELETE(const HTTPRequest& request, const ServerC
 		assignGenericResponse(500);
 	}
 }
+
+/* -------------------------------------------------------------------------- */
+/*                              Helper Functions                              */
+/* -------------------------------------------------------------------------- */
 
 std::string HTTPResponse::extractFolderName(const std::string& uri) {
 	if (uri.empty())
@@ -308,14 +320,7 @@ void HTTPResponse::serveFile(ClientState& client, const std::string& uri) {
 		else
 			assignGenericResponse(405, "This Directory is over 9000!!!");
 	} else if (S_ISREG(path_stat.st_mode)) {
-		// if (endsWith(uri, ".py")) {
-		// 	serveCGI(client, fullPath);
-		// } else {
-			// if (client.killTheChild)
-			// 	client.closeConnection = true;
-			// else
-				serveRegularFile(uri, fullPath);
-		// }
+		serveRegularFile(uri, fullPath);
 	} else {
 		WARNING("Path '" << fullPath << "' could not be recognised! Serving 404 page");
 		assignGenericResponse(404, "These Are Not the Files You Are Looking For");
