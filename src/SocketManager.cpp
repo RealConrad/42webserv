@@ -430,7 +430,6 @@ void SocketManager::sendResponse(pollfd &fd) {
 	if (this->clientStates[fd.fd].writeBuffer.empty()) {
 		WARNING("Nothing to send on socket *" << fd.fd << "*");
 		fd.events = POLLIN;
-		clientStates[fd.fd].assignedConfig = false;
 		return;
 	}
 	ssize_t bytesWritten = send(fd.fd, this->clientStates[fd.fd].writeBuffer.c_str(), this->clientStates[fd.fd].writeBuffer.size(), 0);
@@ -444,7 +443,6 @@ void SocketManager::sendResponse(pollfd &fd) {
 				WARNING("Non-keep-alive connection termination on socket *" << fd.fd << "*");
 				this->clientStates[fd.fd].closeConnection = true;
 			}
-		clientStates[fd.fd].assignedConfig = false;
 		}
 	} else if (bytesWritten == 0) {
 		WARNING("No data was sent for socket *" << fd.fd << "*");
