@@ -156,7 +156,6 @@ int SocketManager::createAndBindSocket(int port) {
 		ERROR("Failed to set to non blocking mode for socket: *" << sockfd << "*");
 		return -1;
 	}
-
 	struct sockaddr_in serv_addr;
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_addr.s_addr = INADDR_ANY;
@@ -166,7 +165,6 @@ int SocketManager::createAndBindSocket(int port) {
 		ERROR("Failed to bind socket to port: " << port);
 		return -1;
 	}
-
 	if (listen(sockfd, SOMAXCONN) < 0) {
 		closeConnection(sockfd);
 		ERROR("Failed to initialize listen for socket: *" << sockfd << "*");
@@ -469,7 +467,7 @@ ServerConfig& SocketManager::getCurrentServer(std::string &hostName, int port) {
 	bool defaultConfig = false;
 	std::vector<ServerConfig>::iterator ogConfig;
 	for (std::vector<ServerConfig>::iterator iter = this->config.serverConfigs.begin(); iter != this->config.serverConfigs.end(); iter++) {
-		if (!defaultConfig && iter->listenPort == port){
+		if (!defaultConfig && iter->listenPort == port) {
 			defaultConfig = true;
 			ogConfig = iter;
 		}

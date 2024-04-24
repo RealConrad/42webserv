@@ -57,23 +57,28 @@ class Logger {
 		 * @param enableLogFile Enables logging to a file instead of the console if true.
 		 */
 		static void initialize(bool enableLogging, bool enableLogFile = false);
+
 		/**
 		 * @brief does not print to output or file a specific level from logging.
 		 * @param level level of logging to hide. 
 		 */
 		static void hide(LogLevel level);
+
 		/**
 		 * @brief does not print to output or file a File and Line part of log (Code link at the end).
 		 */
 		static void hideFileLine();
+
 		/**
 		 * @brief does not print to output or file a Timestamp part of log (time in front of message).
 		 */
 		static void hideTimestamp();
+
 		/**
 		 * @brief does not print to output or file a Level part of log (INFO/DEBUG/ERROR).
 		 */
 		static void hideLevel();
+
 		/**
 		 * @brief Sets whether log messages should include ANSI colour codes or not
 		 * @param value If true, log messages will include ANSI colour codes
@@ -87,7 +92,6 @@ class Logger {
 		 */
 		static void log(const std::string& message, const char* file, int line, LogLevel level = INFO);
 		static std::string makeVisible(const std::string& input);
-		// Deconstructor
 		~Logger();
 	private:
 		Logger(); // Do not make the class instatiable

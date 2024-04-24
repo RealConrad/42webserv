@@ -10,10 +10,7 @@ std::map<int, std::string> HTTPResponse::initializeStatusCodes() {
 	std::map<int, std::string> statusCodes;
 	statusCodes[200] = "OK";
 	statusCodes[201] = "Created";
-	statusCodes[202] = "Accepted";
-	statusCodes[301] = "Moved Permanently";
 	statusCodes[302] = "Found";
-	statusCodes[400] = "Bad Request";
 	statusCodes[403] = "Forbidden";
 	statusCodes[404] = "Not Found";
 	statusCodes[405] = "Method Not Allowed";
@@ -21,7 +18,6 @@ std::map<int, std::string> HTTPResponse::initializeStatusCodes() {
 	statusCodes[413] = "Payload Too Large";
 	statusCodes[500] = "Internal Server Error";
 	statusCodes[501] = "Not Implemented";
-	statusCodes[504] = "Gateway Timeout";
 	return statusCodes;
 }
 
@@ -60,6 +56,10 @@ void HTTPResponse::prepareResponse(HTTPRequest& request, ClientState& client) {
 	}
 }
 
+/* -------------------------------------------------------------------------- */
+/*                                 GET Method                                 */
+/* -------------------------------------------------------------------------- */
+
 void HTTPResponse::handleRequestGET(const HTTPRequest& request, ClientState& client) {
 	std::string requestURI = request.getURI();
 	static int image = 0;
@@ -87,34 +87,42 @@ void HTTPResponse::handleRequestGET(const HTTPRequest& request, ClientState& cli
 	}
 }
 
-void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerConfig& serverConfig) {
-    std::string requestURI = request.getURI();
-    std::string savePath = serverConfig.rootDirectory + requestURI + request.getFileName();
+/* -------------------------------------------------------------------------- */
+/*                                 POST Method                                */
+/* -------------------------------------------------------------------------- */
 
-    bool fileExists = (access(savePath.c_str(), F_OK) != -1);
-    if (fileExists) {
-        WARNING("File already exists: " + savePath);
-        setHeader("Location", requestURI + request.getFileName());
-        setStatusCode(302);
-        setBody("");
-        return;
-    }
-    std::ofstream outFile(savePath.c_str());
-    if (outFile) {
-        outFile.write(request.getBody().c_str(), request.getBody().size());
-        outFile.close();
-        if (!outFile.fail()) {
-            INFO("File uploaded successfully: " + savePath);
-            assignGenericResponse(201, savePath);
-        } else {
-            ERROR("Failed to store file");
-            assignGenericResponse(500);
-        }
-    } else {
-        ERROR("Unable to open file for writing: " + savePath);
-        assignGenericResponse(500);
-    }
+void HTTPResponse::handleRequestPOST(const HTTPRequest& request, const ServerConfig& serverConfig) {
+	std::string requestURI = request.getURI();
+	std::string savePath = serverConfig.rootDirectory + requestURI + request.getFileName();
+
+	bool fileExists = (access(savePath.c_str(), F_OK) != -1);
+	if (fileExists) {
+		WARNING("File already exists: " + savePath);
+		setHeader("Location", requestURI + request.getFileName());
+		setStatusCode(302);
+		setBody("");
+		return;
+	}
+	std::ofstream outFile(savePath.c_str());
+	if (outFile) {
+		outFile.write(request.getBody().c_str(), request.getBody().size());
+		outFile.close();
+		if (!outFile.fail()) {
+			INFO("File uploaded successfully: " + savePath);
+			assignGenericResponse(201, savePath);
+		} else {
+			ERROR("Failed to store file");
+			assignGenericResponse(500);
+		}
+	} else {
+		ERROR("Unable to open file for writing: " + savePath);
+		assignGenericResponse(500);
+	}
 }
+
+/* -------------------------------------------------------------------------- */
+/*                                DELETE Method                               */
+/* -------------------------------------------------------------------------- */
 
 void HTTPResponse::handleRequestDELETE(const HTTPRequest& request, const ServerConfig& serverConfig) {
 	std::string requestURI = request.getURI();
@@ -133,6 +141,10 @@ void HTTPResponse::handleRequestDELETE(const HTTPRequest& request, const ServerC
 		assignGenericResponse(500);
 	}
 }
+
+/* -------------------------------------------------------------------------- */
+/*                              Helper Functions                              */
+/* -------------------------------------------------------------------------- */
 
 std::string HTTPResponse::extractFolderName(const std::string& uri) {
 	if (uri.empty())
@@ -308,14 +320,7 @@ void HTTPResponse::serveFile(ClientState& client, const std::string& uri) {
 		else
 			assignGenericResponse(405, "This Directory is over 9000!!!");
 	} else if (S_ISREG(path_stat.st_mode)) {
-		// if (endsWith(uri, ".py")) {
-		// 	serveCGI(client, fullPath);
-		// } else {
-			// if (client.killTheChild)
-			// 	client.closeConnection = true;
-			// else
-				serveRegularFile(uri, fullPath);
-		// }
+		serveRegularFile(uri, fullPath);
 	} else {
 		WARNING("Path '" << fullPath << "' could not be recognised! Serving 404 page");
 		assignGenericResponse(404, "These Are Not the Files You Are Looking For");
@@ -400,8 +405,8 @@ void HTTPResponse::assignResponse(int statusCode, const std::string& body, std::
 
 void HTTPResponse::assignGenericResponse(int statusCode, const std::string& message) {
 	std::ostringstream stream;
-    std::string code = ::toString(statusCode);
-    std::string codeMessage = statusCodes.find(statusCode) != statusCodes.end() ? statusCodes.at(statusCode) : "Unknown Code In Map";
+	std::string code = ::toString(statusCode);
+	std::string codeMessage = statusCodes.find(statusCode) != statusCodes.end() ? statusCodes.at(statusCode) : "Unknown Code In Map";
 	stream << "<!DOCTYPE html>"
 			<< "<html lang=\"en\">"
 			<< "<head>"
