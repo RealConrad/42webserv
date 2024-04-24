@@ -255,7 +255,6 @@ std::string SocketManager::handleCGI(ClientState& client, std::string& fullPath)
 		INFO("Starting CGI - Forking process");
 		if (pipe(client.childFd) == -1) {
 			ERROR("Failed to create pipe");
-			client.closeConnection = true;
 			return ("Internal server error");
 		}
 		client.childPid = fork();
@@ -263,7 +262,6 @@ std::string SocketManager::handleCGI(ClientState& client, std::string& fullPath)
 			ERROR("Failed to fork");
 			close(client.childFd[0]);
 			close(client.childFd[1]);
-			client.closeConnection = true;
 			return ("Internal server error");
 		} else if (client.childPid == 0) {
 			executeChild(client, fullPath);
@@ -320,6 +318,7 @@ std::string SocketManager::checkAndHandleChildProcess(ClientState& client) {
 				output += buffer;
 				std::memset(buffer, 0, sizeof(buffer));
 			}
+			close(client.childFd[0]);
 			return(output);
 		} else {
 			ERROR("CGI script exited with error");

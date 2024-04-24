@@ -397,8 +397,6 @@ std::string HTTPResponse::isRedirection(const std::string& uri, const ServerConf
 void HTTPResponse::assignResponse(int statusCode, const std::string& body, std::string contentType) {
 	setHeader("Content-Type", contentType);
 	setHeader("Content-Length", ::toString(body.size()));
-	setHeader("Connection", "keep-alive");
-	setHeader("Keep-Alive", "timeout=60, max=50");
 	setBody(body);
 	setStatusCode(statusCode);
 }
